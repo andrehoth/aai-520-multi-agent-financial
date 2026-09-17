@@ -1,7 +1,7 @@
 # Multi-Agent Financial Analysis System
 
-This project is a part of the AAI-520 course in the Applied Artificial Intelligence
-Program at the University of San Diego (USD).
+This project is a part of the AAI-520 Natural Language Processing and GenAI course
+in the Applied Artificial Intelligence Program at the University of San Diego (USD).
 
 **Project Status:** Active
 
@@ -14,8 +14,8 @@ multiple specialized LLM agents. It demonstrates three workflow patterns
 
 ## Team Members
 
-- Andre [last name]
-- [Teammate name]
+- Andre Hoth
+- Ken Lai
 
 ## Installation
 
@@ -33,3 +33,15 @@ cp .env.example .env
 - FRED API -- macroeconomic indicators
 
 ## Repository Structure
+
+agents/ # Agent class definitions
+workflows/ # Prompt chain, router, evaluator-optimizer
+tools/ # API and data wrappers
+memory/ # Persistent memory manager
+fixtures/ # Mock data for development
+notebook.ipynb # Final deliverable
+
+
+## Acknowledgments
+
+Dr. Kahila Mokhtari and AAI-520 course materials, University of San Diego.
