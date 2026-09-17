@@ -216,3 +216,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Environment variables
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# nbstripout
+# (nbstripout handles output stripping; checkpoints still excluded above)
+
+# Fixtures with sensitive data (keep fixtures/ dir but exclude any live snapshots)
+fixtures/live_*.json
