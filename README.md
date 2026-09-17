@@ -34,12 +34,40 @@ cp .env.example .env
 
 ## Repository Structure
 
-agents/ # Agent class definitions
-workflows/ # Prompt chain, router, evaluator-optimizer
-tools/ # API and data wrappers
-memory/ # Persistent memory manager
-fixtures/ # Mock data for development
-notebook.ipynb # Final deliverable
+```
+aai-520-multi-agent-financial/
+├── agents/
+│   ├── __init__.py
+│   ├── base_agent.py
+│   ├── investment_agent.py
+│   ├── earnings_agent.py
+│   ├── news_agent.py
+│   └── market_agent.py
+├── workflows/
+│   ├── __init__.py
+│   ├── prompt_chain.py
+│   └── router.py
+│   └── evaluator_optimizer.py
+├── tools/
+│   ├── __init__.py
+│   ├── price_data.py
+│   ├── news_data.py
+│   ├── fundamentals.py
+│   ├── macro_data.py
+│   └── retrieval.py
+├── memory/
+│   ├── __init__.py
+│   └── agent_memory.py
+├── fixtures/
+│   ├── news_sample.json
+│   ├── fundamentals_sample.json
+│   └── macro_sample.json
+├── .env.example
+├── .gitignore
+├── requirements.txt
+├── README.md
+└── notebook.ipynb
+```
 
 
 ## Acknowledgments
