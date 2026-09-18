@@ -1,0 +1,11 @@
+anthropic
+yfinance
+newsapi-python
+alpha-vantage
+fredapi
+faiss-cpu
+sentence-transformers
+python-dotenv
+nbstripout
+matplotlib
+pandas
