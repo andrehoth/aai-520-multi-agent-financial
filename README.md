@@ -20,9 +20,24 @@ multiple specialized LLM agents. It demonstrates three workflow patterns
 ## Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/<username>/aai-520-multi-agent-financial.git
+cd aai-520-multi-agent-financial
+
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # Mac/Linux
+venv\Scripts\activate     # Windows
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Configure environment variables
 cp .env.example .env
 # Add your API keys to .env
+
+# Install nbstripout Git hook (each collaborator must run this)
+nbstripout --install
 ```
 
 ## Data Sources
