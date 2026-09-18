@@ -9,3 +9,4 @@ python-dotenv
 nbstripout
 matplotlib
 pandas
+langdetect
