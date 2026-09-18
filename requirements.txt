@@ -1,7 +1,6 @@
 anthropic
 yfinance
 newsapi-python
-alpha-vantage
 fredapi
 faiss-cpu
 sentence-transformers
@@ -10,3 +9,4 @@ nbstripout
 matplotlib
 pandas
 langdetect
+requests
