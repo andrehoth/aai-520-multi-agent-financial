@@ -12,13 +12,14 @@ load_dotenv()
 USING_MOCK = False
 
 
-def fetch_earnings(ticker: str, api_key: str = None) -> list[dict]:
+def fetch_earnings(ticker: str, api_key: str = None, quarters: int = 8) -> list[dict]:
     """
-    Fetch the 8 most recent quarterly earnings for a given ticker via Alpha Vantage.
+    Fetch recent quarterly earnings for a given ticker via Alpha Vantage.
 
     Args:
         ticker: Stock symbol (e.g., "AAPL")
         api_key: Alpha Vantage key; falls back to ALPHA_VANTAGE_KEY env variable
+        quarters: Number of most recent quarters to return (default 8)
 
     Returns:
         List of dicts with keys:
@@ -27,17 +28,17 @@ def fetch_earnings(ticker: str, api_key: str = None) -> list[dict]:
     """
     if USING_MOCK:
         return _mock_earnings(ticker)
-    return _live_earnings(ticker, api_key or os.getenv("ALPHA_VANTAGE_KEY"))
+    return _live_earnings(ticker, api_key or os.getenv("ALPHA_VANTAGE_KEY"), quarters)
 
 
-def fetch_income_statement(ticker: str, api_key: str = None) -> list[dict]:
+def fetch_income_statement(ticker: str, api_key: str = None, quarters: int = 8) -> list[dict]:
     """
-    Fetch the 8 most recent quarterly income statements for a given ticker
-    via Alpha Vantage.
+    Fetch recent quarterly income statements for a given ticker via Alpha Vantage.
 
     Args:
         ticker: Stock symbol (e.g., "AAPL")
         api_key: Alpha Vantage key; falls back to ALPHA_VANTAGE_KEY env variable
+        quarters: Number of most recent quarters to return (default 8)
 
     Returns:
         List of dicts with keys:
@@ -45,27 +46,27 @@ def fetch_income_statement(ticker: str, api_key: str = None) -> list[dict]:
     """
     if USING_MOCK:
         return _mock_income_statement(ticker)
-    return _live_income_statement(ticker, api_key or os.getenv("ALPHA_VANTAGE_KEY"))
+    return _live_income_statement(ticker, api_key or os.getenv("ALPHA_VANTAGE_KEY"), quarters)
 
 
-def _live_earnings(ticker: str, api_key: str) -> list[dict]:
+def _live_earnings(ticker: str, api_key: str, quarters: int) -> list[dict]:
     url = (
         f"https://www.alphavantage.co/query"
         f"?function=EARNINGS&symbol={ticker}&apikey={api_key}"
     )
     response = requests.get(url)
     data = response.json()
-    return data.get("quarterlyEarnings", [])[:8]
+    return data.get("quarterlyEarnings", [])[:quarters]
 
 
-def _live_income_statement(ticker: str, api_key: str) -> list[dict]:
+def _live_income_statement(ticker: str, api_key: str, quarters: int) -> list[dict]:
     url = (
         f"https://www.alphavantage.co/query"
         f"?function=INCOME_STATEMENT&symbol={ticker}&apikey={api_key}"
     )
     response = requests.get(url)
     data = response.json()
-    quarterly = data.get("quarterlyReports", [])[:8]
+    quarterly = data.get("quarterlyReports", [])[:quarters]
     return [
         {
             "fiscalDateEnding": r.get("fiscalDateEnding"),
