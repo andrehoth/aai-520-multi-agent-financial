@@ -68,7 +68,6 @@ defined in the AAI-520 course rubric.
         news_data.py           # NewsAPI: financial news articles
         fundamentals.py        # Alpha Vantage: earnings and income statements
         macro_data.py          # FRED API: fed funds rate, CPI, unemployment
-        retrieval.py           # FAISS: vector store and semantic retrieval (stub)
     memory/
         __init__.py
         agent_memory.py        # JSON-backed persistent memory across runs
@@ -181,8 +180,6 @@ components are completed across Modules 4-6.
 
 ### 6.5 FAISS Retrieval
 
-### 6.5 FAISS Retrieval
-
 Decision: Not implemented.
 
 The rubric phrase "dynamic tool use (APIs, datasets, retrieval)" was confirmed
@@ -235,7 +232,6 @@ See README.md for full installation instructions. Key points:
 | tools/fundamentals.py            | Complete |
 | tools/macro_data.py              | Complete |
 | tools/llm.py                     | Complete |
-| tools/retrieval.py               | Stub     |
 | agents/schema.py                 | Complete |
 | agents/base_agent.py             | Complete |
 | agents/investment_agent.py       | Stub     |
