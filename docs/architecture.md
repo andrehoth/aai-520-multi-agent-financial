@@ -94,7 +94,6 @@ Domain boundaries follow agent responsibilities, not arbitrary groupings.
 | Routing: News       | NewsAnalyzer      | Financial news | news_data.py    | NewsAPI       |
 | Routing: Market     | MarketAnalyzer    | Price data     | price_data.py   | yfinance      |
 | Routing: Market     | MarketAnalyzer    | Macro context  | macro_data.py   | FRED API      |
-| Dynamic Tool Use    | All agents        | Retrieval/RAG  | retrieval.py    | FAISS         |
 
 All sources are drawn from the assignment brief's recommended list.
 
@@ -182,13 +181,15 @@ components are completed across Modules 4-6.
 
 ### 6.5 FAISS Retrieval
 
-Decision: Pending. retrieval.py is currently stubbed.
+### 6.5 FAISS Retrieval
 
-Context: The rubric requires dynamic tool use (APIs, datasets, retrieval).
-The four data tools may satisfy this requirement without an explicit vector store,
-since the fetched data is already filtered and focused. A decision will be made
-once the specialist agents are implemented and the actual context window load
-is measured.
+Decision: Not implemented.
+
+The rubric phrase "dynamic tool use (APIs, datasets, retrieval)" was confirmed
+by the course instructor to not require a RAG implementation. The focus should
+be on the required agentic components: planning, dynamic tool use, routing, and
+self-reflection. The four data tool API calls satisfy the retrieval requirement
+in scope (Mokhtari Jadid, K., personal communication, September 2026).
 
 ---
 
@@ -256,3 +257,6 @@ https://arxiv.org/html/2412.00543v1
 
 EvidentlyAI. (2024). LLM-as-a-judge guide.
 https://www.evidentlyai.com/llm-evaluation/llm-as-a-judge
+
+Mokhtari Jadid, K. (2026, September). [Response to student question on RAG
+requirement]. AAI-520 course Slack channel, University of San Diego.
