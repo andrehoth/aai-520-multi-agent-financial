@@ -256,3 +256,104 @@ https://www.evidentlyai.com/llm-evaluation/llm-as-a-judge
 
 Mokhtari Jadid, K. (2026, September). [Response to student question on RAG
 requirement]. AAI-520 course Slack channel, University of San Diego.
+
+## 11. Implementation Guide for Specialist Agents
+
+Each specialist agent follows the same pattern. Inherit from BaseAgent, override
+system_prompt and temperature, implement run() to populate the correct schema
+field, and return the analysis dict.
+
+### Pattern
+
+    from agents.base_agent import BaseAgent
+
+    class EarningsAnalyzer(BaseAgent):
+        temperature = 0.7  # override if needed; use 0.2 for extraction tasks
+
+        @property
+        def system_prompt(self) -> str:
+            return (
+                f"You are a financial earnings analyst specializing in {self.ticker}. "
+                f"Analyze earnings trends, revenue growth, and profit margins. "
+                f"Be factual, concise, and grounded in the data provided."
+            )
+
+        def run(self, analysis: dict) -> dict:
+            # 1. Fetch data using the relevant tool
+            from tools.fundamentals import fetch_earnings, fetch_income_statement
+            earnings = fetch_earnings(self.ticker)
+            income = fetch_income_statement(self.ticker)
+
+            # 2. Build a prompt with the fetched data
+            prompt = (
+                f"Analyze the following earnings and income data for {self.ticker}:\n\n"
+                f"Earnings history:\n{earnings}\n\n"
+                f"Income statements:\n{income}\n\n"
+                f"Provide a concise narrative analysis covering earnings trends, "
+                f"revenue growth, profit margins, and any notable surprises."
+            )
+
+            # 3. Call the LLM via self.call() -- uses self.system_prompt and self.temperature
+            analysis["earnings_analysis"] = self.call(prompt)
+
+            # 4. Return the updated analysis dict
+            return analysis
+
+### Key rules
+
+- Always call self.call(prompt) rather than importing call_llm directly
+- Always populate exactly one schema field per specialist -- see agents/schema.py
+- Always return the full analysis dict, not just the field value
+- Import tools inside run() rather than at module level to keep dependencies explicit
+- Temperature 0.7 for narrative analysis; 0.2 for extraction or structured output
+
+### News agent specifics
+
+news_agent.py receives its input from the prompt chain output, not directly
+from tools/news_data.py. The prompt chain processes raw articles through five
+stages (Ingest, Preprocess, Classify, Extract, Summarize) and returns a processed
+summary. The news agent's run() method receives the analysis dict after the
+prompt chain has already populated context, and produces analysis["news_analysis"].
+
+The prompt chain (workflows/prompt_chain.py) is Ken's primary ownership and
+should be implemented before news_agent.py, since the news agent depends on
+its output.
+
+### Schema reference
+
+    Field to populate      Owner agent
+    earnings_analysis      EarningsAnalyzer
+    news_analysis          NewsAnalyzer
+    market_analysis        MarketAnalyzer
+    synthesis              InvestmentResearchAgent
+    evaluation_score       EvaluatorOptimizer
+    evaluation_feedback    EvaluatorOptimizer
+    reflection             InvestmentResearchAgent
+
+### Workflow implementation pattern
+
+Workflows follow the same dict-passing pattern but are not subclasses of BaseAgent.
+They import call_llm directly from tools/llm.py and accept and return the
+analysis dict.
+
+    from tools.llm import call_llm
+
+    class NewsProcessingChain:
+        def __init__(self, ticker: str):
+            self.ticker = ticker
+
+        def run(self, articles: list[dict]) -> str:
+            # Each stage passes output to the next
+            preprocessed = self._preprocess(articles)
+            classified   = self._classify(preprocessed)
+            extracted    = self._extract(classified)
+            summary      = self._summarize(extracted)
+            return summary
+
+        def _preprocess(self, articles: list[dict]) -> str:
+            prompt = f"Clean and normalize the following articles:\n{articles}"
+            return call_llm(prompt, temperature=0.2)
+
+        # remaining stages follow the same pattern
+
+
