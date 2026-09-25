@@ -9,6 +9,22 @@ schema. See docs/architecture.md for the design decision and tradeoffs.
 All fields are strings except evaluation_score (float) and timestamp (str, ISO format).
 """
 
+from enum import Enum
+
+
+class ContentType(Enum):
+    """
+    Content type enum for routing dispatch.
+
+    The router dispatches on content_type, not on data source, so an earnings
+    article retrieved via NewsAPI correctly routes to EarningsAnalyzer rather
+    than NewsAnalyzer.
+    """
+    NEWS     = "NEWS"
+    EARNINGS = "EARNINGS"
+    MARKET   = "MARKET"
+    MACRO    = "MACRO"
+
 # Schema definition used as a reference and for initializing empty analysis dicts.
 # Not enforced at runtime; all fields are populated progressively as the pipeline runs.
 
