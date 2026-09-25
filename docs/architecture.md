@@ -73,7 +73,11 @@ defined in the AAI-520 course rubric.
         agent_memory.py        # JSON-backed persistent memory across runs
     docs/
         architecture.md        # This document
-    fixtures/                  # Mock data for development
+    fixtures/                  # Shared JSON fixtures for development and testing
+    tests/
+        __init__.py
+        test_schema_contract.py    # Validates inter-agent schema contract
+        test_router.py             # Validates routing dispatch by content type
     .env.example               # Required environment variable names
     .gitignore
     requirements.txt
@@ -246,7 +250,44 @@ See README.md for full installation instructions. Key points:
 
 ---
 
-## 10. References
+## 10. Testing Approach
+
+Tests live in tests/ and use shared JSON fixtures from fixtures/. Both teammates
+maintain fixtures so that Ken's prompt chain output and Andre's router and agent
+interfaces are validated against the same contract.
+
+### test_schema_contract.py
+
+Validates the inter-agent data schema defined in agents/schema.py:
+- All required fields present in empty_analysis() output
+- evaluation_score initialized as float
+- All string fields initialized as empty strings
+- Schema keys match ANALYSIS_SCHEMA keys
+
+### test_router.py
+
+Validates that the ContentRouter dispatches correctly by content type:
+- NEWS content routes to NewsAnalyzer
+- EARNINGS content routes to EarningsAnalyzer
+- MARKET content routes to MarketAnalyzer
+- MACRO content routes to MarketAnalyzer
+- Router dispatches on content, not on data source
+
+The router tests use fixture files from fixtures/ so that both teammates
+can validate routing behavior against the same synthetic inputs without
+making live API or LLM calls.
+
+### Fixture conventions
+
+- All fixtures are synthetic -- label clearly in the fixture file
+- File names follow the pattern: {content_type}_{ticker}_{index}.json
+  e.g., news_aapl_001.json, earnings_aapl_001.json
+- Mock runs use the same fixture contract as live runs
+- Fixtures are committed to the repo and shared between teammates
+
+---
+
+## 11. References
 
 Doosterlinck, K., et al. (2024). Evaluating the consistency of LLM evaluators.
 https://arxiv.org/html/2412.00543v1
@@ -257,7 +298,7 @@ https://www.evidentlyai.com/llm-evaluation/llm-as-a-judge
 Mokhtari Jadid, K. (2026, September). [Response to student question on RAG
 requirement]. AAI-520 course Slack channel, University of San Diego.
 
-## 11. Implementation Guide for Specialist Agents
+## 12. Implementation Guide for Specialist Agents
 
 Each specialist agent follows the same pattern. Inherit from BaseAgent, override
 system_prompt and temperature, implement run() to populate the correct schema
