@@ -241,7 +241,7 @@ See README.md for full installation instructions. Key points:
 | agents/schema.py                 | Complete |
 | agents/base_agent.py             | Complete |
 | agents/investment_agent.py       | Stub     |
-| agents/earnings_agent.py         | Stub     |
+| agents/earnings_agent.py         | Complete |
 | agents/news_agent.py             | Stub     |
 | agents/market_agent.py           | Complete |
 | data/agent_memory.json           | Runtime (gitignored) |
