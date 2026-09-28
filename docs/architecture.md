@@ -246,9 +246,9 @@ See README.md for full installation instructions. Key points:
 | agents/market_agent.py           | Complete |
 | data/agent_memory.json           | Runtime (gitignored) |
 | workflows/prompt_chain.py        | Stub     |
-| workflows/router.py              | Stub     |
+| workflows/router.py              | Complete |
 | workflows/evaluator_optimizer.py | Stub     |
-| memory/agent_memory.py           | Stub     |
+| memory/agent_memory.py           | Complete |
 | notebook.ipynb                   | Empty    |
 
 ---
