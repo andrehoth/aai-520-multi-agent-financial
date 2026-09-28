@@ -56,6 +56,8 @@ def _call_gemini(prompt: str, system: str, temperature: float) -> str:
     """
     Call the Google Gemini API and return the response text.
     Requires GEMINI_API_KEY in environment.
+    AFC (automatic function calling) is explicitly disabled since this
+    wrapper makes simple text generation calls with no tools.
     """
     from google import genai
     from google.genai import types
@@ -63,6 +65,9 @@ def _call_gemini(prompt: str, system: str, temperature: float) -> str:
     config = types.GenerateContentConfig(
         temperature=temperature,
         system_instruction=system if system else None,
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(
+            disable=True
+        ),
     )
     response = client.models.generate_content(
         model=LLM_MODEL,

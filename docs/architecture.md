@@ -71,6 +71,8 @@ defined in the AAI-520 course rubric.
     memory/
         __init__.py
         agent_memory.py        # JSON-backed persistent memory across runs
+    data/                      # Runtime memory storage -- gitignored; created on first run
+        agent_memory.json      # Analysis history keyed by ticker
     docs/
         architecture.md        # This document
     fixtures/                  # Shared JSON fixtures for development and testing
@@ -239,9 +241,10 @@ See README.md for full installation instructions. Key points:
 | agents/schema.py                 | Complete |
 | agents/base_agent.py             | Complete |
 | agents/investment_agent.py       | Stub     |
-| agents/earnings_agent.py         | Stub     |
+| agents/earnings_agent.py         | Complete |
 | agents/news_agent.py             | Stub     |
-| agents/market_agent.py           | Stub     |
+| agents/market_agent.py           | Complete |
+| data/agent_memory.json           | Runtime (gitignored) |
 | workflows/prompt_chain.py        | Stub     |
 | workflows/router.py              | Stub     |
 | workflows/evaluator_optimizer.py | Stub     |

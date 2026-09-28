@@ -228,3 +228,6 @@ __marimo__/
 
 # Fixtures with sensitive data (keep fixtures/ dir but exclude any live snapshots)
 fixtures/live_*.json
+
+# Runtime data directory -- created by save_memory() on first run; not committed
+data/
