@@ -18,6 +18,9 @@ while evaluation and extraction benefit from lower values for consistency.
 import os
 from dotenv import load_dotenv
 
+import warnings
+warnings.filterwarnings("ignore", message=".*AFC.*")
+
 load_dotenv()
 
 USING_MOCK = False
