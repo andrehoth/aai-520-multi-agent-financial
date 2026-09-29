@@ -36,6 +36,8 @@ def fetch_price_summary(ticker: str) -> dict:
 
 def _live_price_history(ticker: str, period: str) -> pd.DataFrame:
     data = yf.Ticker(ticker).history(period=period)
+    data.index = data.index.date
+    data.index.name = "Date"
     return data[["Open", "High", "Low", "Close", "Volume"]]
 
 

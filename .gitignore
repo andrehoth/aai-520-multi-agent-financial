@@ -231,3 +231,6 @@ fixtures/live_*.json
 
 # Runtime data directory -- created by save_memory() on first run; not committed
 data/
+
+# macOS
+.DS_Store
