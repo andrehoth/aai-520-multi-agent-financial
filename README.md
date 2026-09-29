@@ -20,14 +20,16 @@ multiple specialized LLM agents. It demonstrates three workflow patterns
 ## Installation
 
 ```bash
-# Create and activate virtual environment (outside the repo)
-python3 -m venv ../venv
-source ../venv/bin/activate  # Mac/Linux
-..\venv\Scripts\activate     # Windows
-
-# Clone the repository and install dependencies
-git clone https://github.com/<username>/aai-520-multi-agent-financial.git
+# Clone the repository
+git clone https://github.com/andrehoth/aai-520-multi-agent-financial.git
 cd aai-520-multi-agent-financial
+
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate  # Mac/Linux
+venv\Scripts\activate     # Windows
+
+# Install dependencies
 pip install -r requirements.txt
 
 # Configure environment variables
@@ -38,12 +40,23 @@ cp .env.example .env
 nbstripout --install
 ```
 
+## API Keys Required
+
+All keys are free tier and require no credit card.
+
+| Key | Source |
+|---|---|
+| GEMINI_API_KEY | aistudio.google.com |
+| NEWSAPI_KEY | newsapi.org |
+| ALPHA_VANTAGE_KEY | alphavantage.co |
+| FRED_API_KEY | fred.stlouisfed.org |
+
 ## Data Sources
 
-- Yahoo Finance (`yfinance`) -- price and market data
-- NewsAPI -- financial news
-- Alpha Vantage -- earnings and fundamentals
-- FRED API -- macroeconomic indicators
+- Yahoo Finance (yfinance): price and market data
+- NewsAPI: financial news articles
+- Alpha Vantage: earnings and income statement data
+- FRED API: macroeconomic indicators
 
 ## Repository Structure
 
@@ -55,33 +68,36 @@ aai-520-multi-agent-financial/
 │   ├── investment_agent.py
 │   ├── earnings_agent.py
 │   ├── news_agent.py
-│   └── market_agent.py
+│   ├── market_agent.py
+│   └── schema.py
 ├── workflows/
 │   ├── __init__.py
 │   ├── prompt_chain.py
-│   └── router.py
+│   ├── router.py
 │   └── evaluator_optimizer.py
 ├── tools/
 │   ├── __init__.py
+│   ├── llm.py
 │   ├── price_data.py
 │   ├── news_data.py
 │   ├── fundamentals.py
-│   ├── macro_data.py
-│   └── retrieval.py
+│   └── macro_data.py
 ├── memory/
 │   ├── __init__.py
 │   └── agent_memory.py
+├── tests/
+│   ├── __init__.py
+│   ├── test_schema_contract.py
+│   └── test_router.py
 ├── fixtures/
-│   ├── news_sample.json
-│   ├── fundamentals_sample.json
-│   └── macro_sample.json
+├── docs/
+│   └── architecture.md
 ├── .env.example
 ├── .gitignore
 ├── requirements.txt
 ├── README.md
 └── notebook.ipynb
 ```
-
 
 ## Acknowledgments
 
