@@ -3,63 +3,56 @@
 News specialist agent for the Multi-Agent Financial Analysis System.
 
 Receives processed news content from workflows/prompt_chain.py and
-produces a narrative analysis covering sentiment, key themes, and
-material risks or catalysts identified in recent coverage.
+produces a narrative analysis covering material developments, sentiment,
+and implications for the stock.
 
 Populates analysis["news_analysis"] in the shared analysis dict.
 See agents/schema.py for the full schema definition.
-
-STUB IMPLEMENTATION: This stub passes prompt chain output directly to
-a single LLM analysis call. Ken Lai will replace this with the full
-implementation incorporating classification confidence and sentiment scoring.
 """
 
 from agents.base_agent import BaseAgent
-from tools.news_data import fetch_news
-from workflows.prompt_chain import NewsProcessingChain
 
 
 class NewsAnalyzer(BaseAgent):
-    """
-    Specialist agent that analyzes processed financial news content.
-    Dispatched by ContentRouter when content_type is NEWS.
+    """Analyze financial news relevant to the selected stock."""
 
-    Depends on NewsProcessingChain output -- prompt chain must run
-    before this agent is called.
-    """
+    temperature = 0.2
 
     @property
     def system_prompt(self) -> str:
+        """Return the system instructions for financial news analysis."""
         return (
-            f"You are a financial news analyst specializing in {self.ticker}. "
-            f"Analyze the provided news summary for sentiment, key themes, "
-            f"material risks, and potential catalysts. Be factual and concise. "
-            f"Ground all observations in the provided content."
+            f"You are a financial news analyst researching {self.ticker}. "
+            "Analyze relevant news objectively and identify material developments "
+            "that may affect the company or its stock. Distinguish reported facts "
+            "from speculation, and do not invent facts or sources."
         )
 
-    def run(self, analysis: dict) -> dict:
+    def run(self, analysis: dict, processed_news: str = "") -> dict:
         """
-        Fetch news, run through prompt chain, analyze with LLM, and
-        populate analysis["news_analysis"].
+        Analyze processed financial news and populate news_analysis.
 
         Args:
-            analysis: Shared analysis dict (see agents/schema.py)
+            analysis: Shared analysis dictionary.
+            processed_news: News content produced by NewsProcessingChain.
 
         Returns:
-            Updated analysis dict with news_analysis populated
+            The shared analysis dictionary with news_analysis populated.
         """
-        # Fetch raw articles and process through prompt chain
-        articles = fetch_news(self.ticker)
-        chain = NewsProcessingChain(self.ticker)
-        chain_output = chain.run(articles)
+        if not processed_news:
+            analysis["news_analysis"] = (
+                "No relevant news was available for analysis."
+            )
+            return analysis
 
         prompt = (
-            f"Based on the following processed news summary for {self.ticker}, "
-            f"provide a concise analysis covering: overall sentiment (positive, "
-            f"negative, or mixed), key themes driving recent coverage, material "
-            f"risks identified, and any potential catalysts.\n\n"
-            f"Processed News Summary:\n{chain_output}"
+            f"Analyze the following processed financial news for {self.ticker}.\n\n"
+            f"{processed_news}\n\n"
+            "Provide a concise narrative covering the most material developments, "
+            "their potential implications for the company or stock, and any "
+            "important uncertainty. Distinguish facts from speculation."
         )
 
         analysis["news_analysis"] = self.call(prompt)
+
         return analysis
