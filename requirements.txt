@@ -9,3 +9,4 @@ google-genai
 nbstripout
 matplotlib
 beautifulsoup4
+pytest
