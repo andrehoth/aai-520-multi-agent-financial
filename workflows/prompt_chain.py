@@ -1,83 +1,149 @@
 # workflows/prompt_chain.py
 """
-Workflow 1: Prompt Chaining -- News Processing Pipeline
+Five-stage financial news processing workflow.
 
-Implements a five-stage news processing chain:
+Implements a sequential news processing chain where the output of each
+stage is passed as input to the next:
     Ingest > Preprocess > Classify > Extract > Summarize
 
-STUB IMPLEMENTATION: This stub performs a single LLM summarization call
-on the raw articles to unblock pipeline development. Ken Lai will replace
-this with the full five-stage chain implementation.
+Each stage is a separate LLM call. The chain is self-contained;
+news retrieval occurs inside ingest() via tools/news_data.fetch_news().
 
-Interface contract (must be preserved in final implementation):
-    - Accepts: list of article dicts from tools/news_data.py
-    - Returns: str narrative summary of processed news content
+See agents/schema.py for the shared analysis dict definition.
 """
 
+from tools.news_data import fetch_news
 from tools.llm import call_llm
 
 
 class NewsProcessingChain:
-    """
-    Five-stage news processing chain for a given ticker.
-    Dispatched by InvestmentResearchAgent before routing to NewsAnalyzer.
-
-    Stages (stub combines into single call; Ken implements each separately):
-        1. Ingest    -- receive raw articles from NewsAPI
-        2. Preprocess -- clean and normalize article text
-        3. Classify  -- categorize articles by financial topic
-        4. Extract   -- identify key financial signals and data points
-        5. Summarize -- produce concise narrative summary
-    """
-
-    # Lower temperature for extraction and classification stages
-    temperature = 0.2
+    """Retrieve and process financial news for a stock ticker."""
 
     def __init__(self, ticker: str):
-        """
-        Args:
-            ticker: Stock symbol being researched (e.g., "AAPL")
-        """
         self.ticker = ticker
 
-    def run(self, articles: list[dict]) -> str:
-        """
-        Process raw news articles through the chain and return a summary.
+    def ingest(self) -> list[dict]:
+        """Retrieve recent news articles using the shared NewsAPI tool."""
+        return fetch_news(self.ticker)
 
-        Args:
-            articles: List of article dicts from tools/news_data.fetch_news()
-                      Each dict has keys: title, description, content,
-                      source, published_at
+    def preprocess(self, articles: list[dict]) -> str:
+        """Convert retrieved news articles into clean text for LLM processing."""
+        processed_articles = []
 
-        Returns:
-            Narrative string summarizing processed news content
-        """
-        if not articles:
-            return f"No recent news articles found for {self.ticker}."
+        for article in articles:
+            title = article.get("title") or ""
+            description = article.get("description") or ""
+            content = article.get("content") or ""
+            source = article.get("source") or ""
+            published_at = article.get("published_at") or ""
 
-        # STUB: single LLM call combining all five stages
-        # Ken replaces this with five separate stage methods
-        formatted = "\n\n".join([
-            f"Title: {a.get('title', '')}\n"
-            f"Source: {a.get('source', '')}\n"
-            f"Published: {a.get('published_at', '')}\n"
-            f"Content: {a.get('description', '') or a.get('content', '')}"
-            for a in articles
-        ])
+            article_text = (
+                f"Title: {title}\n"
+                f"Source: {source}\n"
+                f"Published: {published_at}\n"
+                f"Description: {description}\n"
+                f"Content: {content}"
+            )
+
+            processed_articles.append(article_text)
+
+        return "\n\n---\n\n".join(processed_articles)
+
+    def classify(self, processed_news: str) -> str:
+        """Classify retrieved news for relevance to the target stock."""
+        if not processed_news:
+            return ""
 
         prompt = (
-            f"The following are recent news articles about {self.ticker}. "
-            f"Preprocess, classify by financial topic, extract key financial "
-            f"signals, and produce a concise narrative summary of the most "
-            f"relevant news.\n\n{formatted}"
+            f"Review the following retrieved news for ticker {self.ticker}.\n\n"
+            f"{processed_news}\n\n"
+            "Identify which items are relevant to an investment analysis of "
+            f"{self.ticker}. Exclude unrelated or coincidental matches. "
+            "Return only the relevant news items, preserving their key facts, "
+            "sources, and publication dates."
         )
 
         return call_llm(
             prompt=prompt,
             system=(
-                f"You are a financial news analyst specializing in {self.ticker}. "
-                f"Extract and summarize only the most financially relevant "
-                f"information. Be factual and concise."
+                "You are a financial news relevance classifier. "
+                "Filter retrieved news conservatively and do not invent information."
             ),
-            temperature=self.temperature
+            temperature=0.2,
         )
+
+    def extract(self, classified_news: str) -> str:
+        """Extract investment-relevant facts from classified financial news."""
+        if not classified_news:
+            return ""
+
+        prompt = (
+            f"Extract the most important investment-relevant facts for "
+            f"{self.ticker} from the following classified news.\n\n"
+            f"{classified_news}\n\n"
+            "For each material development, identify:\n"
+            "- the event or development\n"
+            "- key factual details\n"
+            "- the source and publication date when available\n"
+            "- any explicitly reported financial or business impact\n\n"
+            "Do not add conclusions, predictions, or facts that are not present "
+            "in the supplied news."
+        )
+
+        return call_llm(
+            prompt=prompt,
+            system=(
+                "You are a financial information extraction specialist. "
+                "Extract only information supported by the supplied news."
+            ),
+            temperature=0.2,
+        )
+
+    def summarize(self, extracted_news: str) -> str:
+        """Summarize extracted news facts for downstream analysis."""
+        if not extracted_news:
+            return ""
+
+        prompt = (
+            f"Summarize the following extracted financial news facts for "
+            f"{self.ticker}.\n\n"
+            f"{extracted_news}\n\n"
+            "Produce a concise factual summary of the material developments. "
+            "Preserve important quantitative details, sources, and dates when "
+            "available. Do not provide an investment recommendation, predict "
+            "stock performance, or introduce facts not contained in the input."
+        )
+
+        return call_llm(
+            prompt=prompt,
+            system=(
+                "You are a financial news summarization specialist. "
+                "Produce concise, factual summaries grounded only in the "
+                "supplied information."
+            ),
+            temperature=0.2,
+        )
+
+    def run(self) -> str:
+        """Run the complete five-stage news processing chain."""
+        articles = self.ingest()
+
+        if not articles:
+            return ""
+
+        processed = self.preprocess(articles)
+
+        if not processed:
+            return ""
+
+        classified = self.classify(processed)
+
+        if not classified:
+            return ""
+
+        extracted = self.extract(classified)
+
+        if not extracted:
+            return ""
+
+        return self.summarize(extracted)
