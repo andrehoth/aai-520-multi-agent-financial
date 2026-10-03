@@ -194,6 +194,23 @@ be on the required agentic components: planning, dynamic tool use, routing, and
 self-reflection. The four data tool API calls satisfy the retrieval requirement
 in scope (Mokhtari Jadid, K., personal communication, September 2026).
 
+### 6.6 NewsProcessingChain and NewsAnalyzer Interface
+
+Decision: NewsProcessingChain is self-contained; news retrieval occurs inside
+ingest() via tools/news_data.fetch_news(). The chain takes no arguments in run().
+
+NewsAnalyzer.run() accepts processed_news as a parameter rather than fetching
+news internally. The orchestrator runs the chain first and passes the output:
+
+    chain = NewsProcessingChain(ticker)
+    processed_news = chain.run()
+    analysis = news_agent.run(analysis, processed_news=processed_news)
+
+Rationale: Separating chain execution from agent analysis allows the chain output
+to be inspected independently, which is useful for the notebook demonstration of
+Workflow 1. The chain handles all five stages internally and returns a single
+narrative string to the news agent.
+
 ---
 
 ## 7. LLM Temperature Guidelines
@@ -222,7 +239,7 @@ have meaningfully different needs.
 
 See README.md for full installation instructions. Key points:
 
-- Virtual environment is created parallel to the repo, not inside it
+- Virtual environment is created inside the repo at venv/ (gitignored)
 - API keys go in .env (gitignored); key names are documented in .env.example
 - nbstripout --install must be run inside the repo by each collaborator
 - Dependencies are installed incrementally as modules are implemented
@@ -231,25 +248,25 @@ See README.md for full installation instructions. Key points:
 
 ## 9. Implementation Status
 
-| File                             | Status   |
-|----------------------------------|----------|
-| tools/price_data.py              | Complete |
-| tools/news_data.py               | Complete |
-| tools/fundamentals.py            | Complete |
-| tools/macro_data.py              | Complete |
-| tools/llm.py                     | Complete |
-| agents/schema.py                 | Complete |
-| agents/base_agent.py             | Complete |
-| agents/investment_agent.py       | Stub     |
-| agents/earnings_agent.py         | Complete |
-| agents/news_agent.py             | Stub     |
-| agents/market_agent.py           | Complete |
+| File                             | Status      |
+|----------------------------------|-------------|
+| tools/price_data.py              | Complete    |
+| tools/news_data.py               | Complete    |
+| tools/fundamentals.py            | Complete    |
+| tools/macro_data.py              | Complete    |
+| tools/llm.py                     | Complete    |
+| agents/schema.py                 | Complete    |
+| agents/base_agent.py             | Complete    |
+| agents/investment_agent.py       | Stub        |
+| agents/earnings_agent.py         | Complete    |
+| agents/news_agent.py             | Complete    |
+| agents/market_agent.py           | Complete    |
 | data/agent_memory.json           | Runtime (gitignored) |
-| workflows/prompt_chain.py        | Stub     |
-| workflows/router.py              | Complete |
-| workflows/evaluator_optimizer.py | Stub     |
-| memory/agent_memory.py           | Complete |
-| notebook.ipynb                   | Empty    |
+| workflows/prompt_chain.py        | Complete    |
+| workflows/router.py              | Complete    |
+| workflows/evaluator_optimizer.py | Complete (loop pending) |
+| memory/agent_memory.py           | Complete    |
+| notebook.ipynb                   | In Progress |
 
 ---
 
@@ -301,6 +318,8 @@ https://www.evidentlyai.com/llm-evaluation/llm-as-a-judge
 Mokhtari Jadid, K. (2026, September). [Response to student question on RAG
 requirement]. AAI-520 course Slack channel, University of San Diego.
 
+---
+
 ## 12. Implementation Guide for Specialist Agents
 
 Each specialist agent follows the same pattern. Inherit from BaseAgent, override
@@ -323,7 +342,7 @@ field, and return the analysis dict.
             )
 
         def run(self, analysis: dict) -> dict:
-            # 1. Fetch data using the relevant tool
+            # 1. Fetch data using the relevant tool (module-level or local import)
             from tools.fundamentals import fetch_earnings, fetch_income_statement
             earnings = fetch_earnings(self.ticker)
             income = fetch_income_statement(self.ticker)
@@ -348,20 +367,19 @@ field, and return the analysis dict.
 - Always call self.call(prompt) rather than importing call_llm directly
 - Always populate exactly one schema field per specialist -- see agents/schema.py
 - Always return the full analysis dict, not just the field value
-- Import tools inside run() rather than at module level to keep dependencies explicit
 - Temperature 0.7 for narrative analysis; 0.2 for extraction or structured output
+- Tool imports may be at module level or inside run() -- both are acceptable
 
-### News agent specifics
+### News agent calling pattern
 
-news_agent.py receives its input from the prompt chain output, not directly
-from tools/news_data.py. The prompt chain processes raw articles through five
-stages (Ingest, Preprocess, Classify, Extract, Summarize) and returns a processed
-summary. The news agent's run() method receives the analysis dict after the
-prompt chain has already populated context, and produces analysis["news_analysis"].
+NewsAnalyzer has a different calling pattern from the other specialists.
+The orchestrator must run the prompt chain first and pass the output explicitly:
 
-The prompt chain (workflows/prompt_chain.py) is Ken's primary ownership and
-should be implemented before news_agent.py, since the news agent depends on
-its output.
+    chain = NewsProcessingChain(ticker)
+    processed_news = chain.run()
+    analysis = news_agent.run(analysis, processed_news=processed_news)
+
+See Section 6.6 for the full rationale.
 
 ### Schema reference
 
@@ -386,18 +404,16 @@ analysis dict.
         def __init__(self, ticker: str):
             self.ticker = ticker
 
-        def run(self, articles: list[dict]) -> str:
-            # Each stage passes output to the next
-            preprocessed = self._preprocess(articles)
-            classified   = self._classify(preprocessed)
-            extracted    = self._extract(classified)
-            summary      = self._summarize(extracted)
-            return summary
+        def run(self) -> str:
+            # Each stage passes output to the next; ingest() fetches internally
+            articles = self.ingest()
+            preprocessed = self.preprocess(articles)
+            classified = self.classify(preprocessed)
+            extracted = self.extract(classified)
+            return self.summarize(extracted)
 
-        def _preprocess(self, articles: list[dict]) -> str:
-            prompt = f"Clean and normalize the following articles:\n{articles}"
-            return call_llm(prompt, temperature=0.2)
+        def ingest(self) -> list[dict]:
+            from tools.news_data import fetch_news
+            return fetch_news(self.ticker)
 
         # remaining stages follow the same pattern
-
-
