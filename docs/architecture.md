@@ -257,7 +257,7 @@ See README.md for full installation instructions. Key points:
 | tools/llm.py                     | Complete    |
 | agents/schema.py                 | Complete    |
 | agents/base_agent.py             | Complete    |
-| agents/investment_agent.py       | Stub        |
+| agents/investment_agent.py       | Complete    |
 | agents/earnings_agent.py         | Complete    |
 | agents/news_agent.py             | Complete    |
 | agents/market_agent.py           | Complete    |
@@ -266,7 +266,7 @@ See README.md for full installation instructions. Key points:
 | workflows/router.py              | Complete    |
 | workflows/evaluator_optimizer.py | Complete (loop pending) |
 | memory/agent_memory.py           | Complete    |
-| notebook.ipynb                   | In Progress |
+| notebook.ipynb                   | In Progress (Sections 8-11 complete; Section 7 pending Ken) |
 
 ---
 
