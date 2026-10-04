@@ -42,7 +42,8 @@ class EvaluatorOptimizer:
         for line in response.splitlines():
             if line.startswith("SCORE:"):
                 try:
-                    score = float(line.split(":", 1)[1].strip())
+                    score_str = line.split(":", 1)[1].strip()
+                    score = float(score_str.split("/")[0].strip())
                 except ValueError:
                     score = 0.0
             elif line.startswith("FEEDBACK:"):
