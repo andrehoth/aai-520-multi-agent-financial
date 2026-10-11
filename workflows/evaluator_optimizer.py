@@ -6,8 +6,15 @@ from tools.llm import call_llm
 class EvaluatorOptimizer:
     """Evaluate and refine synthesized investment analysis."""
 
-    def __init__(self, ticker: str):
+    def __init__(
+        self,
+        ticker: str,
+        threshold: float = 7.0,
+        max_iterations: int = 3,
+    ):
         self.ticker = ticker
+        self.threshold = threshold
+        self.max_iterations = max_iterations
 
     def evaluate(self, synthesis: str) -> tuple[float, str]:
         """Evaluate a synthesized investment analysis and return score and feedback."""
@@ -83,15 +90,23 @@ class EvaluatorOptimizer:
         )
 
     def run(self, analysis: dict) -> dict:
-        """Evaluate and refine the synthesis in the shared analysis dictionary."""
+        """Evaluate and refine synthesis until quality threshold or max iterations."""
         synthesis = analysis.get("synthesis", "")
 
-        score, feedback = self.evaluate(synthesis)
+        for iteration in range(self.max_iterations):
+            score, feedback = self.evaluate(synthesis)
 
-        analysis["evaluation_score"] = score
-        analysis["evaluation_feedback"] = feedback
+            analysis["evaluation_score"] = score
+            analysis["evaluation_feedback"] = feedback
 
-        if synthesis and feedback:
-            analysis["synthesis"] = self.refine(synthesis, feedback)
+            if score >= self.threshold:
+                break
+
+            if iteration == self.max_iterations - 1:
+                break
+
+            if synthesis and feedback:
+                synthesis = self.refine(synthesis, feedback)
+                analysis["synthesis"] = synthesis
 
         return analysis
