@@ -45,6 +45,7 @@ class EvaluatorOptimizer:
 
         score = 0.0
         feedback = response.strip()
+        feedback_start = False
 
         for line in response.splitlines():
             if line.startswith("SCORE:"):
@@ -53,8 +54,13 @@ class EvaluatorOptimizer:
                     score = float(score_str.split("/")[0].strip())
                 except ValueError:
                     score = 0.0
+                feedback_start = False
             elif line.startswith("FEEDBACK:"):
-                feedback = line.split(":", 1)[1].strip()
+                inline = line.split(":", 1)[1].strip()
+                feedback = inline
+                feedback_start = True
+            elif feedback_start:
+                feedback += "\n" + line
 
         score = max(0.0, min(10.0, score))
 

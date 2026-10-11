@@ -78,8 +78,9 @@ defined in the AAI-520 course rubric.
     fixtures/                  # Shared JSON fixtures for development and testing
     tests/
         __init__.py
-        test_schema_contract.py    # Validates inter-agent schema contract
-        test_router.py             # Validates routing dispatch by content type
+        test_schema_contract.py        # Validates inter-agent schema contract
+        test_router.py                 # Validates routing dispatch by content type
+        test_evaluator_optimizer.py    # Validates evaluator-optimizer loop behavior
     .env.example               # Required environment variable names
     .gitignore
     requirements.txt
@@ -264,17 +265,17 @@ See README.md for full installation instructions. Key points:
 | data/agent_memory.json           | Runtime (gitignored) |
 | workflows/prompt_chain.py        | Complete    |
 | workflows/router.py              | Complete    |
-| workflows/evaluator_optimizer.py | Complete (loop pending) |
+| workflows/evaluator_optimizer.py | Complete    |
 | memory/agent_memory.py           | Complete    |
-| notebook.ipynb                   | In Progress (Sections 8-11 complete; Section 7 pending Ken) |
+| tests/test_evaluator_optimizer.py | Complete   |
+| notebook.ipynb                   | Complete    |
 
 ---
 
 ## 10. Testing Approach
 
-Tests live in tests/ and use shared JSON fixtures from fixtures/. Both teammates
-maintain fixtures so that Ken's prompt chain output and Andre's router and agent
-interfaces are validated against the same contract.
+Tests live in tests/. All tests use mocks rather than fixtures so no live API
+or LLM calls are required.
 
 ### test_schema_contract.py
 
@@ -283,27 +284,28 @@ Validates the inter-agent data schema defined in agents/schema.py:
 - evaluation_score initialized as float
 - All string fields initialized as empty strings
 - Schema keys match ANALYSIS_SCHEMA keys
+- ContentType enum contains all four required values
+- ContentType values are uppercase strings
 
 ### test_router.py
 
-Validates that the ContentRouter dispatches correctly by content type:
+Validates that the ContentRouter dispatches correctly by content type.
+classify() and specialist agents are mocked per test -- no LLM or API calls made:
 - NEWS content routes to NewsAnalyzer
 - EARNINGS content routes to EarningsAnalyzer
 - MARKET content routes to MarketAnalyzer
 - MACRO content routes to MarketAnalyzer
-- Router dispatches on content, not on data source
+- Router dispatches on content subject matter, not on data source
+- Only the dispatched specialist's schema field is populated after routing
+- Unrecognized LLM classification defaults to ContentType.NEWS
 
-The router tests use fixture files from fixtures/ so that both teammates
-can validate routing behavior against the same synthetic inputs without
-making live API or LLM calls.
+### test_evaluator_optimizer.py
 
-### Fixture conventions
-
-- All fixtures are synthetic -- label clearly in the fixture file
-- File names follow the pattern: {content_type}_{ticker}_{index}.json
-  e.g., news_aapl_001.json, earnings_aapl_001.json
-- Mock runs use the same fixture contract as live runs
-- Fixtures are committed to the repo and shared between teammates
+Validates the EvaluatorOptimizer loop behavior. evaluate() and refine() are
+mocked to return controlled scores without LLM calls:
+- Stops immediately when threshold is already met on the first pass
+- Refines and terminates early when threshold is reached on a subsequent evaluation
+- Terminates at max iterations when threshold is not reached
 
 ---
 

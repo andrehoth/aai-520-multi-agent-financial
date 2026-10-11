@@ -42,11 +42,12 @@ class ContentRouter:
             ticker: Stock symbol being researched (e.g., "AAPL")
         """
         self.ticker = ticker
+        market_analyzer = MarketAnalyzer(ticker)
         self.specialists = {
-            ContentType.NEWS:     NewsAnalyzer(ticker),
+            ContentType.NEWS: NewsAnalyzer(ticker),
             ContentType.EARNINGS: EarningsAnalyzer(ticker),
-            ContentType.MARKET:   MarketAnalyzer(ticker),
-            ContentType.MACRO:    MarketAnalyzer(ticker),
+            ContentType.MARKET: market_analyzer,
+            ContentType.MACRO: market_analyzer,
         }
 
     def classify(self, content: str) -> ContentType:
@@ -71,11 +72,15 @@ class ContentRouter:
             f"Content:\n{content[:500]}"
         )
 
-        result = call_llm(
-            prompt=prompt,
-            system="You are a financial content classifier. Respond with exactly one word.",
-            temperature=self.temperature
-        ).strip().upper()
+        result = (
+            call_llm(
+                prompt=prompt,
+                system="You are a financial content classifier. Respond with exactly one word.",
+                temperature=self.temperature,
+            )
+            .strip()
+            .upper()
+        )
 
         # Map result to ContentType, default to NEWS if unrecognized
         try:
@@ -95,7 +100,9 @@ class ContentRouter:
             Updated analysis dict with specialist field populated
         """
         content_type = self.classify(content)
-        print(f"  Router: classified as {content_type.value} -> "
-              f"{self.specialists[content_type].__class__.__name__}")
+        print(
+            f"  Router: classified as {content_type.value} -> "
+            f"{self.specialists[content_type].__class__.__name__}"
+        )
 
         return self.specialists[content_type].run(analysis)
