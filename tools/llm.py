@@ -16,6 +16,7 @@ while evaluation and extraction benefit from lower values for consistency.
 """
 
 import os
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -41,15 +42,34 @@ def call_llm(prompt: str, system: str = None, temperature: float = 0.7) -> str:
 
     Returns:
         Model response as a plain string
+
+    Transient server errors are retried up to 3 times with exponential
+    backoff (5s, 10s, 20s) before raising.
     """
+
     if USING_MOCK:
         return _mock_response(prompt)
-    if LLM_PROVIDER == "gemini":
-        return _call_gemini(prompt, system, temperature)
-    raise ValueError(
-        f"Unsupported LLM_PROVIDER: {LLM_PROVIDER}. "
-        f"Supported providers: gemini"
-    )
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            if LLM_PROVIDER == "gemini":
+                return _call_gemini(prompt, system, temperature)
+            raise ValueError(
+                f"Unsupported LLM_PROVIDER: {LLM_PROVIDER}. "
+                f"Supported providers: gemini"
+            )
+        except ValueError:
+            raise  # Do not retry configuration errors
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait = 5 * (2**attempt)  # 5s, 10s, 20s
+                print(
+                    f"      LLM call failed (attempt {attempt + 1}/{max_retries}), retrying in {wait}s..."
+                )
+                time.sleep(wait)
+            else:
+                raise
 
 
 def _call_gemini(prompt: str, system: str, temperature: float) -> str:
@@ -61,13 +81,12 @@ def _call_gemini(prompt: str, system: str, temperature: float) -> str:
     """
     from google import genai
     from google.genai import types
+
     client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
     config = types.GenerateContentConfig(
         temperature=temperature,
         system_instruction=system if system else None,
-        automatic_function_calling=types.AutomaticFunctionCallingConfig(
-            disable=True
-        ),
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
     response = client.models.generate_content(
         model=LLM_MODEL,

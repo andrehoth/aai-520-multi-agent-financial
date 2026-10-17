@@ -81,11 +81,16 @@ defined in the AAI-520 course rubric.
         test_schema_contract.py        # Validates inter-agent schema contract
         test_router.py                 # Validates routing dispatch by content type
         test_evaluator_optimizer.py    # Validates evaluator-optimizer loop behavior
+        test_llm.py                    # Validates LLM wrapper retry behavior
+        test_news_data.py              # Validates news tool error handling
+        test_price_data.py             # Validates price tool error handling
+        test_fundamentals.py           # Validates fundamentals tool error handling
+        test_macro_data.py             # Validates macro tool error handling
     .env.example               # Required environment variable names
     .gitignore
     requirements.txt
     README.md
-    notebook.ipynb             # Primary graded deliverable
+    AAI520_MultiAgent_Financial_Analysis.ipynb  # Primary graded deliverable
 
 ---
 
@@ -175,6 +180,11 @@ variables (LLM_PROVIDER, LLM_MODEL).
 Current provider: Google Gemini (gemini-3.6-flash), free tier.
 Anthropic support can be added to _call_anthropic() in tools/llm.py if needed.
 
+Retry behavior: call_llm() retries transient failures up to three times with
+exponential backoff (5s, 10s, 20s) before raising. Configuration errors such
+as unsupported provider are not retried. This was added after a real-world 503
+from the Gemini API during development demonstrated the need.
+
 ### 6.4 Module-First, Notebook-Last
 
 Decision: All system logic lives in .py files. The notebook imports from
@@ -211,6 +221,29 @@ Rationale: Separating chain execution from agent analysis allows the chain outpu
 to be inspected independently, which is useful for the notebook demonstration of
 Workflow 1. The chain handles all five stages internally and returns a single
 narrative string to the news agent.
+
+### 6.7 Graceful Degradation in Data Tools
+
+Decision: All four data tools return empty results on API failure rather than
+raising exceptions and halting the pipeline.
+
+Rationale: The tools are independent -- a NewsAPI failure should not prevent
+price data or macro data from being retrieved. The synthesizer already handles
+missing data explicitly by acknowledging gaps rather than fabricating figures,
+so empty tool output is a valid input state.
+
+Tradeoff accepted: A degraded run may produce a weaker analysis without surfacing
+the root cause beyond a warning print statement. A production system would use
+structured logging and alerting instead. The graceful degradation pattern was
+chosen over fail-fast because transient API failures are common on free-tier
+endpoints and should not invalidate an entire analysis run.
+
+Return values on failure:
+- price_data.py:   empty DataFrame (fetch_price_history), None values (fetch_price_summary)
+- news_data.py:    empty list
+- fundamentals.py: empty list
+- macro_data.py:   dict with empty lists per indicator; individual series failures
+                   do not block other series from being fetched
 
 ---
 
@@ -249,26 +282,31 @@ See README.md for full installation instructions. Key points:
 
 ## 9. Implementation Status
 
-| File                             | Status      |
-|----------------------------------|-------------|
-| tools/price_data.py              | Complete    |
-| tools/news_data.py               | Complete    |
-| tools/fundamentals.py            | Complete    |
-| tools/macro_data.py              | Complete    |
-| tools/llm.py                     | Complete    |
-| agents/schema.py                 | Complete    |
-| agents/base_agent.py             | Complete    |
-| agents/investment_agent.py       | Complete    |
-| agents/earnings_agent.py         | Complete    |
-| agents/news_agent.py             | Complete    |
-| agents/market_agent.py           | Complete    |
-| data/agent_memory.json           | Runtime (gitignored) |
-| workflows/prompt_chain.py        | Complete    |
-| workflows/router.py              | Complete    |
-| workflows/evaluator_optimizer.py | Complete    |
-| memory/agent_memory.py           | Complete    |
-| tests/test_evaluator_optimizer.py | Complete   |
-| notebook.ipynb                   | Complete    |
+| File                                       | Status      |
+|--------------------------------------------|-------------|
+| tools/price_data.py                        | Complete    |
+| tools/news_data.py                         | Complete    |
+| tools/fundamentals.py                      | Complete    |
+| tools/macro_data.py                        | Complete    |
+| tools/llm.py                               | Complete    |
+| agents/schema.py                           | Complete    |
+| agents/base_agent.py                       | Complete    |
+| agents/investment_agent.py                 | Complete    |
+| agents/earnings_agent.py                   | Complete    |
+| agents/news_agent.py                       | Complete    |
+| agents/market_agent.py                     | Complete    |
+| data/agent_memory.json                     | Runtime (gitignored) |
+| workflows/prompt_chain.py                  | Complete    |
+| workflows/router.py                        | Complete    |
+| workflows/evaluator_optimizer.py           | Complete    |
+| memory/agent_memory.py                     | Complete    |
+| tests/test_evaluator_optimizer.py          | Complete    |
+| tests/test_llm.py                          | Complete    |
+| tests/test_news_data.py                    | Complete    |
+| tests/test_price_data.py                   | Complete    |
+| tests/test_fundamentals.py                 | Complete    |
+| tests/test_macro_data.py                   | Complete    |
+| AAI520_MultiAgent_Financial_Analysis.ipynb | Complete    |
 
 ---
 
@@ -306,6 +344,20 @@ mocked to return controlled scores without LLM calls:
 - Stops immediately when threshold is already met on the first pass
 - Refines and terminates early when threshold is reached on a subsequent evaluation
 - Terminates at max iterations when threshold is not reached
+
+### test_llm.py
+
+Validates the call_llm() retry behavior. time.sleep and the provider function
+are mocked so no real API calls or wait times occur:
+- Retries up to three times on transient failures and succeeds when provider recovers
+- Raises after exhausting all retries
+- Does not retry configuration errors (unsupported provider)
+
+### test_news_data.py, test_price_data.py, test_fundamentals.py, test_macro_data.py
+
+Validate graceful degradation behavior for each data tool:
+- Returns empty result on API failure rather than raising
+- Returns correct data structure on success
 
 ---
 
