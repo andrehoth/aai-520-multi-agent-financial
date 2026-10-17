@@ -28,24 +28,29 @@ def fetch_news(ticker: str, api_key: str = None) -> list[dict]:
 
 
 def _live_news(ticker: str, api_key: str) -> list[dict]:
-    client = NewsApiClient(api_key=api_key)
-    response = client.get_everything(
-        q=f'"{ticker}" stock',
-        language="en",
-        sort_by="publishedAt",
-        page_size=10
-    )
-    return [
-        {
-            "title": a.get("title"),
-            "description": a.get("description"),
-            "content": a.get("content"),
-            "source": a.get("source", {}).get("name"),
-            "published_at": a.get("publishedAt"),
-        }
-        for a in response.get("articles", [])
-        if _is_english(a.get("title", "") + " " + a.get("description", ""))
-    ]
+    """
+    Fetch news from NewsAPI. Returns empty list on failure rather than
+    halting the pipeline -- the synthesizer handles missing news gracefully.
+    """
+    try:
+        client = NewsApiClient(api_key=api_key)
+        response = client.get_everything(
+            q=f'"{ticker}" stock', language="en", sort_by="publishedAt", page_size=10
+        )
+        return [
+            {
+                "title": a.get("title"),
+                "description": a.get("description"),
+                "content": a.get("content"),
+                "source": a.get("source", {}).get("name"),
+                "published_at": a.get("publishedAt"),
+            }
+            for a in response.get("articles", [])
+            if _is_english(a.get("title", "") + " " + a.get("description", ""))
+        ]
+    except Exception as e:
+        print(f"      Warning: news fetch failed for {ticker} -- {e}")
+        return []
 
 
 def _is_english(text: str) -> bool:
