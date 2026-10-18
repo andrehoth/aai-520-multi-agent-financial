@@ -19,7 +19,7 @@ class EarningsAnalyzer(BaseAgent):
     Specialist agent that analyzes quarterly earnings and income statement data.
     Dispatched by ContentRouter when content_type is EARNINGS.
     """
-    
+
     @property
     def system_prompt(self) -> str:
         return (
@@ -34,6 +34,10 @@ class EarningsAnalyzer(BaseAgent):
         Fetch earnings and income statement data, analyze with LLM, and
         populate analysis["earnings_analysis"].
 
+        If neither dataset is available (for example, the Alpha Vantage daily
+        request limit was reached), the LLM call is skipped and a short
+        unavailability note is stored instead.
+
         Args:
             analysis: Shared analysis dict (see agents/schema.py)
 
@@ -43,6 +47,18 @@ class EarningsAnalyzer(BaseAgent):
         # Fetch the 8 most recent quarters of earnings and income data
         earnings = fetch_earnings(self.ticker)
         income   = fetch_income_statement(self.ticker)
+
+        # Sending empty lists to the model produced a reply asking the user to
+        # supply the data. That reply would be stored as the analysis and flow
+        # into the synthesis, evaluation, reflection, and memory. A short factual
+        # note lets the synthesis acknowledge the gap instead, matching how
+        # NewsAnalyzer handles missing news.
+        if not earnings and not income:
+            print(f"      Warning: no earnings data for {self.ticker}; skipping LLM analysis")
+            analysis["earnings_analysis"] = (
+                "Earnings and income statement data were unavailable for analysis."
+            )
+            return analysis
 
         prompt = (
             f"Analyze the following earnings and income statement data for "

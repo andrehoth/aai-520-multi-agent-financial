@@ -7,11 +7,13 @@ AAI-520 Final Project | University of San Diego | Andre Hoth & Ken Lai
 ## 1. Project Objective
 
 Given a stock ticker symbol, the system autonomously plans a research strategy,
-retrieves financial and news data from multiple sources, routes that content to
+retrieves financial and news data from multiple sources, analyzes it with
 specialized analyst agents, synthesizes a coherent investment analysis, evaluates
 and refines its own output, and retains memory across runs to improve future
 analyses. The system satisfies the four agent functions and three workflow patterns
-defined in the AAI-520 course rubric.
+defined in the AAI-520 course rubric. Content routing (Workflow 2) is implemented
+and demonstrated separately; the pipeline calls the specialists directly (see
+Section 6.8).
 
 ---
 
@@ -28,8 +30,6 @@ defined in the AAI-520 course rubric.
     NewsProcessingChain                      [Workflow 1: Prompt Chaining]
     Ingest > Preprocess > Classify > Extract > Summarize
          |
-    ContentRouter                            [Workflow 2: Routing]
-         |
          |--------------|--------------|
     EarningsAnalyzer  NewsAnalyzer  MarketAnalyzer
          |--------------|--------------|
@@ -42,6 +42,9 @@ defined in the AAI-520 course rubric.
     InvestmentResearchAgent -- Self-Reflection  [Agent Function: Self-Reflection]
          |
     Final Investment Analysis Report
+
+    Note: The ContentRouter (Workflow 2, workflows/router.py) is not part of this
+    flow. The orchestrator calls the three specialists directly (see Section 6.8).
 
 ---
 
@@ -75,9 +78,9 @@ defined in the AAI-520 course rubric.
         agent_memory.json      # Analysis history keyed by ticker
     docs/
         architecture.md        # This document
-    fixtures/                  # Shared JSON fixtures for development and testing
     tests/
         __init__.py
+        README.md                      # How to run the tests
         test_schema_contract.py        # Validates inter-agent schema contract
         test_router.py                 # Validates routing dispatch by content type
         test_evaluator_optimizer.py    # Validates evaluator-optimizer loop behavior
@@ -86,11 +89,14 @@ defined in the AAI-520 course rubric.
         test_price_data.py             # Validates price tool error handling
         test_fundamentals.py           # Validates fundamentals tool error handling
         test_macro_data.py             # Validates macro tool error handling
+        test_specialist_agents.py      # Validates specialist data-availability guards
     .env.example               # Required environment variable names
     .gitignore
+    LICENSE
     requirements.txt
     README.md
     AAI520_MultiAgent_Financial_Analysis.ipynb  # Primary graded deliverable
+    AAI520_MultiAgent_Financial_Analysis.html   # Exported notebook with outputs (submission copy)
 
 ---
 
@@ -130,7 +136,9 @@ structured schema. See Section 6 for the design decision and tradeoffs.
 The dict is initialized via empty_analysis(ticker) at the start of each run.
 All fields are populated in sequence as the pipeline progresses. Empty string
 fields reliably indicate stages that have not yet run, allowing safe falsy checks
-without risking a KeyError.
+without risking a KeyError. A specialist that has no data stores a short
+unavailability note instead of an analysis (see Section 6.7), so a populated
+field means the stage ran, not that it produced analysis.
 
 ---
 
@@ -157,16 +165,23 @@ Tradeoffs accepted:
 
 ### 6.2 Evaluation Score Scale: 0-10
 
-Decision: The EvaluatorOptimizer scores analyses on a 0-10 integer scale.
+Decision: The EvaluatorOptimizer scores analyses on a 0-10 scale. Scores are
+parsed as floats, so half-point values such as 8.5 occur.
 
-Rationale: Research shows 1-100 scales produce round-number bias and range
-underutilization in LLM evaluators, with scores clustering in a narrow
-high-scoring band regardless of actual output quality. A 1-10 scale achieves
-higher inter-rater consistency (Doosterlinck et al., 2024; EvidentlyAI, 2024).
+Rationale: A 10-point interval scale was selected because interval scales
+(5-point and 10-point) produced more self-consistent LLM evaluations than Likert
+or binary scales for most of the models compared by Lee et al. (2024). That
+study did not test a 0-100 scale, so this decision does not rest on evidence that
+0-100 scales perform worse. The evaluator also runs at a low sampling temperature
+(0.2), since lower temperatures increased self-consistency for the open-source
+model tested in the same study.
 
-Note: A detailed rubric with anchor descriptions at each score level is required
-for consistent results regardless of scale choice. This rubric is defined in
-workflows/evaluator_optimizer.py.
+Limitation: LLM evaluator scores can vary between calls on identical text, so
+small score differences between runs are not treated as evidence of improvement
+or degradation.
+
+Note: A rubric with anchor descriptions at each score level is defined in
+workflows/evaluator_optimizer.py to constrain how scores are assigned.
 
 ### 6.3 Provider-Independent LLM Wrapper
 
@@ -177,13 +192,19 @@ Rationale: Swapping providers requires updating one file only, with no changes
 to agent or workflow code. Provider and model are configured via environment
 variables (LLM_PROVIDER, LLM_MODEL).
 
-Current provider: Google Gemini (gemini-3.6-flash), free tier.
-Anthropic support can be added to _call_anthropic() in tools/llm.py if needed.
+Current provider: Google Gemini (gemini-3.6-flash). Only the gemini provider is
+implemented; supporting another requires a new _call_<provider>() function and a
+matching branch in call_llm().
 
-Retry behavior: call_llm() retries transient failures up to three times with
-exponential backoff (5s, 10s, 20s) before raising. Configuration errors such
-as unsupported provider are not retried. This was added after a real-world 503
-from the Gemini API during development demonstrated the need.
+Retry behavior: call_llm() makes up to three attempts when a provider function
+reports a transient failure by raising TransientLLMError (for Gemini: server
+errors, rate limits, and connection failures), waiting 5s and then 10s between
+attempts (exponential backoff) before raising the last error. Configuration
+errors, invalid API keys, unknown model names, and an exhausted spending cap
+are not retried and fail immediately. Each provider function decides which of
+its own errors are transient, so the retry policy stays in one place and works
+for any provider. This was added after a real-world 503 from the Gemini API
+during development demonstrated the need.
 
 ### 6.4 Module-First, Notebook-Last
 
@@ -200,10 +221,10 @@ components are completed across Modules 4-6.
 Decision: Not implemented.
 
 The rubric phrase "dynamic tool use (APIs, datasets, retrieval)" was confirmed
-by the course instructor to not require a RAG implementation. The focus should
-be on the required agentic components: planning, dynamic tool use, routing, and
-self-reflection. The four data tool API calls satisfy the retrieval requirement
-in scope (Mokhtari Jadid, K., personal communication, September 2026).
+by the course instructor to not require a RAG implementation (Mokhtari Jadid,
+K., personal communication, September 2026). Retrieval is provided by the four
+live data tools, and development focused on the required agent functions
+(planning, dynamic tool use, self-reflection, and memory) and workflow patterns.
 
 ### 6.6 NewsProcessingChain and NewsAnalyzer Interface
 
@@ -220,7 +241,9 @@ news internally. The orchestrator runs the chain first and passes the output:
 Rationale: Separating chain execution from agent analysis allows the chain output
 to be inspected independently, which is useful for the notebook demonstration of
 Workflow 1. The chain handles all five stages internally and returns a single
-narrative string to the news agent.
+narrative string to the news agent. Ingest retrieves articles and Preprocess
+formats them as text; Classify, Extract, and Summarize are the three LLM calls,
+all at temperature 0.2.
 
 ### 6.7 Graceful Degradation in Data Tools
 
@@ -238,12 +261,46 @@ structured logging and alerting instead. The graceful degradation pattern was
 chosen over fail-fast because transient API failures are common on free-tier
 endpoints and should not invalidate an entire analysis run.
 
+Silent failures: Alpha Vantage reports an exhausted daily quota (25 requests per
+day on the free tier) as an HTTP 200 response carrying a message and no data, so
+no exception is raised. fundamentals.py therefore inspects the response, prints
+the message with the API key redacted (the message echoes the key, and requests
+exceptions include the full request URL), and returns an empty list. Successful
+responses are cached in memory for the session so a full notebook run requests
+each endpoint once. Empty results are never cached, so a rate-limited call is
+retried on the next request. The free tier also enforces a burst limit of 1
+request per second, so live requests are spaced at least 1.2 seconds apart.
+
+Specialist guard: when a specialist has no data at all, it skips the LLM call and
+stores a short unavailability note, for example "Earnings and income statement
+data were unavailable for analysis." Without the guard, the model is asked to
+analyze empty lists and replies asking the user to supply the data. That reply
+would be stored as the analysis and flow into the synthesis, evaluation,
+reflection, and memory. The note matches how NewsAnalyzer handles missing news
+and lets the synthesis acknowledge the gap. Partial data, such as earnings
+without an income statement, is still sent to the model.
+
 Return values on failure:
 - price_data.py:   empty DataFrame (fetch_price_history), None values (fetch_price_summary)
 - news_data.py:    empty list
 - fundamentals.py: empty list
 - macro_data.py:   dict with empty lists per indicator; individual series failures
                    do not block other series from being fetched
+
+### 6.8 Routing Demonstrated Separately from the Pipeline
+
+Decision: InvestmentResearchAgent calls the three specialists directly. The
+ContentRouter (Workflow 2) is demonstrated separately in the notebook and covered
+by tests, and is not invoked during agent.run().
+
+Rationale: All three specialists run on every analysis in a known order, and each
+retrieves its own data, so there is no mixed stream of content for a router to
+classify at run time. Routing through the router would add an LLM classification
+call whose result is known in advance.
+
+Tradeoff accepted: Routing is implemented and demonstrated but not exercised by the
+pipeline. Classifying retrieved news articles by content type and sending them to
+the matching specialist is a possible extension.
 
 ---
 
@@ -252,12 +309,18 @@ Return values on failure:
 Temperature is passed per call rather than set globally, because pipeline stages
 have meaningfully different needs.
 
-| Stage          | Recommended Temperature | Rationale                               |
-|----------------|-------------------------|-----------------------------------------|
-| Planning       | 0.7                     | Varied research angles beneficial       |
-| Summarization  | 0.7                     | Narrative flexibility improves readability |
-| Extraction     | 0.2                     | Consistent signal identification        |
-| Evaluation     | 0.2                     | Deterministic scoring for stable loop   |
+| Stage                                              | Temperature | Rationale                                         |
+|----------------------------------------------------|-------------|---------------------------------------------------|
+| Planning, synthesis, reflection (InvestmentResearchAgent) | 0.7  | Varied research angles; narrative flexibility improves readability |
+| Earnings and market analysis (specialists)         | 0.7         | BaseAgent default; narrative flexibility improves readability |
+| News chain: classify, extract, summarize           | 0.2         | Consistent output from stage to stage             |
+| News analysis (NewsAnalyzer)                       | 0.2         | Consistent reading of the news                    |
+| Evaluation and refinement (EvaluatorOptimizer)     | 0.2         | Deterministic scoring for a stable loop           |
+| Routing classification (ContentRouter)             | 0.2         | Deterministic classification                      |
+
+These values were checked against the code by searching agents/ and workflows/
+for temperature settings. EarningsAnalyzer and MarketAnalyzer set none, so they
+inherit the BaseAgent default of 0.7.
 
 ---
 
@@ -276,37 +339,42 @@ See README.md for full installation instructions. Key points:
 - Virtual environment is created inside the repo at venv/ (gitignored)
 - API keys go in .env (gitignored); key names are documented in .env.example
 - nbstripout --install must be run inside the repo by each collaborator
-- Dependencies are installed incrementally as modules are implemented
+- Dependencies are installed with pip install -r requirements.txt
+- Tests run with python -m pytest -v (no API calls are made)
 
 ---
 
 ## 9. Implementation Status
 
-| File                                       | Status      |
-|--------------------------------------------|-------------|
-| tools/price_data.py                        | Complete    |
-| tools/news_data.py                         | Complete    |
-| tools/fundamentals.py                      | Complete    |
-| tools/macro_data.py                        | Complete    |
-| tools/llm.py                               | Complete    |
-| agents/schema.py                           | Complete    |
-| agents/base_agent.py                       | Complete    |
-| agents/investment_agent.py                 | Complete    |
-| agents/earnings_agent.py                   | Complete    |
-| agents/news_agent.py                       | Complete    |
-| agents/market_agent.py                     | Complete    |
-| data/agent_memory.json                     | Runtime (gitignored) |
-| workflows/prompt_chain.py                  | Complete    |
-| workflows/router.py                        | Complete    |
-| workflows/evaluator_optimizer.py           | Complete    |
-| memory/agent_memory.py                     | Complete    |
-| tests/test_evaluator_optimizer.py          | Complete    |
-| tests/test_llm.py                          | Complete    |
-| tests/test_news_data.py                    | Complete    |
-| tests/test_price_data.py                   | Complete    |
-| tests/test_fundamentals.py                 | Complete    |
-| tests/test_macro_data.py                   | Complete    |
-| AAI520_MultiAgent_Financial_Analysis.ipynb | Complete    |
+| File                             | Status      |
+|----------------------------------|-------------|
+| tools/price_data.py              | Complete    |
+| tools/news_data.py               | Complete    |
+| tools/fundamentals.py            | Complete    |
+| tools/macro_data.py              | Complete    |
+| tools/llm.py                     | Complete    |
+| agents/schema.py                 | Complete    |
+| agents/base_agent.py             | Complete    |
+| agents/investment_agent.py       | Complete    |
+| agents/earnings_agent.py         | Complete    |
+| agents/news_agent.py             | Complete    |
+| agents/market_agent.py           | Complete    |
+| data/agent_memory.json           | Runtime (gitignored) |
+| workflows/prompt_chain.py        | Complete    |
+| workflows/router.py              | Complete    |
+| workflows/evaluator_optimizer.py | Complete    |
+| memory/agent_memory.py           | Complete    |
+| tests/test_schema_contract.py     | Complete   |
+| tests/test_router.py              | Complete   |
+| tests/test_evaluator_optimizer.py | Complete   |
+| tests/test_llm.py                 | Complete   |
+| tests/test_news_data.py           | Complete   |
+| tests/test_price_data.py          | Complete   |
+| tests/test_fundamentals.py        | Complete   |
+| tests/test_macro_data.py          | Complete   |
+| tests/test_specialist_agents.py   | Complete   |
+| AAI520_MultiAgent_Financial_Analysis.ipynb | Complete |
+| AAI520_MultiAgent_Financial_Analysis.html  | Exported from a full run |
 
 ---
 
@@ -349,9 +417,10 @@ mocked to return controlled scores without LLM calls:
 
 Validates the call_llm() retry behavior. time.sleep and the provider function
 are mocked so no real API calls or wait times occur:
-- Retries up to three times on transient failures and succeeds when provider recovers
-- Raises after exhausting all retries
+- Succeeds when the provider recovers within three attempts, waiting 5s and then 10s
+- Raises after exhausting all three attempts
 - Does not retry configuration errors (unsupported provider)
+- Does not retry non-transient errors such as an invalid API key
 
 ### test_news_data.py, test_price_data.py, test_fundamentals.py, test_macro_data.py
 
@@ -359,18 +428,29 @@ Validate graceful degradation behavior for each data tool:
 - Returns empty result on API failure rather than raising
 - Returns correct data structure on success
 
+### test_fundamentals.py (Alpha Vantage specific coverage)
+
+Beyond graceful degradation, validates the behavior specific to Alpha Vantage:
+- An HTTP 200 quota message returns an empty list, reports the reason, and keeps
+  the API key out of the printed output
+- Exception text containing the request URL does not leak the API key
+- Successful results are cached for the session and returned as independent copies
+- Empty results are not cached, so a rate-limited call is retried
+- Back-to-back requests are spaced to respect the 1-request-per-second burst limit
+
+### test_specialist_agents.py
+
+Validates the data-availability guards in EarningsAnalyzer and MarketAnalyzer,
+with all fetches and LLM calls patched:
+- With no data at all, the LLM call is skipped and an unavailability note is stored
+- With partial data, the LLM is still called on the data that exists
+
 ---
 
 ## 11. References
 
-Doosterlinck, K., et al. (2024). Evaluating the consistency of LLM evaluators.
-https://arxiv.org/html/2412.00543v1
-
-EvidentlyAI. (2024). LLM-as-a-judge guide.
-https://www.evidentlyai.com/llm-evaluation/llm-as-a-judge
-
-Mokhtari Jadid, K. (2026, September). [Response to student question on RAG
-requirement]. AAI-520 course Slack channel, University of San Diego.
+Lee, N., Hong, J., & Thorne, J. (2024). Evaluating the consistency of LLM
+evaluators. arXiv. https://arxiv.org/abs/2412.00543
 
 ---
 
@@ -423,6 +503,8 @@ field, and return the analysis dict.
 - Always return the full analysis dict, not just the field value
 - Temperature 0.7 for narrative analysis; 0.2 for extraction or structured output
 - Tool imports may be at module level or inside run() -- both are acceptable
+- If a specialist has no data at all, skip the LLM call and store a short
+  unavailability note (see Section 6.7)
 
 ### News agent calling pattern
 
@@ -448,9 +530,10 @@ See Section 6.6 for the full rationale.
 
 ### Workflow implementation pattern
 
-Workflows follow the same dict-passing pattern but are not subclasses of BaseAgent.
-They import call_llm directly from tools/llm.py and accept and return the
-analysis dict.
+Workflows are not subclasses of BaseAgent and import call_llm directly from
+tools/llm.py. The router and evaluator-optimizer accept and return the analysis
+dict; the news chain returns a narrative string that the orchestrator passes to
+NewsAnalyzer (see Section 6.6).
 
     from tools.llm import call_llm
 
