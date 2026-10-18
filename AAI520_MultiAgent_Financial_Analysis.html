@@ -7808,11 +7808,7 @@ a.anchor-link {
 <h1 id="Multi-Agent-Financial-Analysis-System">Multi-Agent Financial Analysis System<a class="anchor-link" href="#Multi-Agent-Financial-Analysis-System">¶</a></h1><p><strong>AAI-520 Final Project | University of San Diego</strong>
 Andre Hoth &amp; Ken Lai</p>
 <hr/>
-<h2 id="Project-Overview">Project Overview<a class="anchor-link" href="#Project-Overview">¶</a></h2><p>This notebook demonstrates an autonomous Investment Research Agent that, given a
-stock ticker symbol, plans its own research strategy, retrieves financial and news
-data from multiple sources, routes that content to specialized analyst agents,
-synthesizes a coherent investment analysis, evaluates and refines its own output,
-and retains memory across runs to improve future analyses.</p>
+<h2 id="Project-Overview">Project Overview<a class="anchor-link" href="#Project-Overview">¶</a></h2><p>This notebook demonstrates an autonomous Investment Research Agent that, given a stock ticker symbol, plans its own research strategy, retrieves financial and news data from multiple sources, analyzes it with specialized agents, synthesizes a coherent investment analysis, evaluates and refines its own output, and retains memory across runs to improve future analyses. Content routing, which directs content to the right specialist, is implemented and demonstrated separately in Section 6; the full pipeline invokes the three specialists directly.</p>
 <h3 id="Rubric-Requirements-Demonstrated">Rubric Requirements Demonstrated<a class="anchor-link" href="#Rubric-Requirements-Demonstrated">¶</a></h3><table>
 <thead>
 <tr>
@@ -7932,7 +7928,7 @@ and retains memory across runs to improve future analyses.</p>
 <pre>Ticker:       AAPL
 LLM Provider: gemini
 LLM Model:    gemini-3.6-flash
-Timestamp:    2026-10-17T11:10:00.360940
+Timestamp:    2026-10-18T08:45:29.487491
 </pre>
 </div>
 </div>
@@ -7992,8 +7988,11 @@ determine the data domains, which in turn determine the tool files.</p>
 </tbody>
 </table>
 <h3 id="Agent-Function:-Dynamic-Tool-Use">Agent Function: Dynamic Tool Use<a class="anchor-link" href="#Agent-Function:-Dynamic-Tool-Use">¶</a></h3><p>The assignment requires the agent to "use tools dynamically (APIs, datasets,
-retrieval)." Each tool is called only when the agent's research plan calls for
-it. The instructor confirmed that an explicit RAG implementation is not required;
+retrieval)." Each specialist agent calls the tools for its own data domain at
+run time, retrieving live data for the requested ticker from four external
+APIs. Tool selection follows agent responsibility boundaries, so each
+specialist uses only the tools relevant to its analytical domain. The
+instructor confirmed that an explicit RAG implementation is not required;
 the four API tool calls satisfy the retrieval requirement in scope
 (Mokhtari Jadid, K., personal communication, September 2026).</p>
 <h3 id="Inter-Agent-Schema-Decision">Inter-Agent Schema Decision<a class="anchor-link" href="#Inter-Agent-Schema-Decision">¶</a></h3><p>A narrative dict is used to pass analysis between components rather than a typed
@@ -8076,9 +8075,7 @@ ContentType values available to router: ['NEWS', 'EARNINGS', 'MARKET', 'MACRO']
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <hr/>
-<h2 id="4.-Agent-Function:-Dynamic-Tool-Use">4. Agent Function: Dynamic Tool Use<a class="anchor-link" href="#4.-Agent-Function:-Dynamic-Tool-Use">¶</a></h2><p>The four data tools are called dynamically based on the agent's research plan.
-Each tool wraps a specific API and returns structured data for its domain.
-Real API calls are made at runtime and no mock data is used in this notebook.</p>
+<h2 id="4.-Agent-Function:-Dynamic-Tool-Use">4. Agent Function: Dynamic Tool Use<a class="anchor-link" href="#4.-Agent-Function:-Dynamic-Tool-Use">¶</a></h2><p>The four data tools are called at run time by the specialist agents and the news processing chain, each retrieving live data for the requested ticker. The InvestmentResearchAgent orchestrates these tools through its specialist agents and supporting workflows. Although the research planner generates an analysis strategy, the current implementation follows a predefined execution sequence rather than dynamically selecting tools based on the plan. Each tool wraps a specific API, and all data in this notebook is retrieved live at run time rather than mocked.</p>
 </div>
 </div>
 </div>
@@ -8276,19 +8273,19 @@ Language filtering via langdetect and query refinement are applied at fetch time
 <pre>News articles fetched for AAPL: 10
 
 Article 1:
+  Title:  Apple Hit a Record Close Ahead of Its November 2 Report. Here’s What Charging for Extra Siri AI Could Mean for the Stock
+  Source: Biztoc.com
+  Date:   2026-10-17T15:39:02Z
+
+Article 2:
+  Title:  Only 10.7% of tokenized stock market cap is issuer-sponsored
+  Source: Crypto Briefing
+  Date:   2026-10-17T12:37:09Z
+
+Article 3:
   Title:  Is Apple the Ultimate Stock to Buy Right Now?
   Source: Biztoc.com
   Date:   2026-10-15T22:07:54Z
-
-Article 2:
-  Title:  A 20% Drop in Smartphone Shipments Shows Who Wins When Memory Gets Expensive
-  Source: PRNewswire
-  Date:   2026-10-15T13:28:00Z
-
-Article 3:
-  Title:  Premarket Movers: AAPL Gains On China AI Approval Report — Why WMT, NFLX Stocks Are Also Rising
-  Source: Biztoc.com
-  Date:   2026-10-15T11:01:08Z
 
 </pre>
 </div>
@@ -8304,7 +8301,10 @@ Article 3:
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h3 id="Tool-3:-Earnings-and-Fundamentals-(Alpha-Vantage)">Tool 3: Earnings and Fundamentals (Alpha Vantage)<a class="anchor-link" href="#Tool-3:-Earnings-and-Fundamentals-(Alpha-Vantage)">¶</a></h3><p>Fetches quarterly earnings history and income statement data for the
 demonstration ticker. Serves the EarningsAnalyzer specialist agent.
-Results are limited to the 8 most recent quarters for relevance.</p>
+Results are limited to the 8 most recent quarters for relevance.
+Alpha Vantage's free tier allows 25 requests per day, so successful responses
+are cached for the session. When the requests succeed, a full notebook run
+requests earnings and income statement data once each.</p>
 </div>
 </div>
 </div>
@@ -8319,8 +8319,9 @@ Results are limited to the 8 most recent quarters for relevance.</p>
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># ── Tool 3: Earnings and Fundamentals ────────────────────────────────────────</span>
 <span class="c1"># Alpha Vantage wrapper; API key required (free tier, register at alphavantage.co)</span>
 <span class="c1"># Downstream consumer: EarningsAnalyzer (agents/earnings_agent.py)</span>
-<span class="c1"># Limited to 8 most recent quarters</span>
-
+<span class="c1"># Limited to 8 most recent quarters. Successful responses are cached for the</span>
+<span class="c1"># session, so the specialist agents later in this notebook reuse this data</span>
+<span class="c1"># instead of spending more of the free tier's 25 requests per day.</span>
 <span class="n">earnings</span> <span class="o">=</span> <span class="n">fetch_earnings</span><span class="p">(</span><span class="n">TICKER</span><span class="p">)</span>
 <span class="n">income</span> <span class="o">=</span> <span class="n">fetch_income_statement</span><span class="p">(</span><span class="n">TICKER</span><span class="p">)</span>
 
@@ -8332,21 +8333,8 @@ Results are limited to the 8 most recent quarters for relevance.</p>
             <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">q</span><span class="p">[</span><span class="s1">'estimatedEPS'</span><span class="p">]</span><span class="si">}</span><span class="s2"> (surprise: </span><span class="si">{</span><span class="n">q</span><span class="p">[</span><span class="s1">'surprisePercentage'</span><span class="p">]</span><span class="si">}</span><span class="s2">%)"</span>
         <span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"Earnings data unavailable (Alpha Vantage rate limit reached)"</span><span class="p">)</span>
-
-<span class="k">if</span> <span class="n">earnings</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Earnings history for </span><span class="si">{</span><span class="n">TICKER</span><span class="si">}</span><span class="s2"> (most recent 3 quarters):"</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">earnings</span><span class="p">[:</span><span class="mi">3</span><span class="p">]:</span>
-        <span class="nb">print</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">q</span><span class="p">[</span><span class="s1">'fiscalDateEnding'</span><span class="p">]</span><span class="si">}</span><span class="s2">: EPS </span><span class="si">{</span><span class="n">q</span><span class="p">[</span><span class="s1">'reportedEPS'</span><span class="p">]</span><span class="si">}</span><span class="s2"> vs estimate "</span>
-            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">q</span><span class="p">[</span><span class="s1">'estimatedEPS'</span><span class="p">]</span><span class="si">}</span><span class="s2"> (surprise: </span><span class="si">{</span><span class="n">q</span><span class="p">[</span><span class="s1">'surprisePercentage'</span><span class="p">]</span><span class="si">}</span><span class="s2">%)"</span>
-        <span class="p">)</span>
-<span class="k">else</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span>
-        <span class="s2">"Earnings data returned empty. Possible causes: API rate limit, "</span>
-        <span class="s2">"network error, or invalid ticker. Check Alpha Vantage quota at "</span>
-        <span class="s2">"alphavantage.co/support."</span>
-    <span class="p">)</span>
+    <span class="c1"># The tool prints the reason above (for example, a daily request limit)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Earnings data unavailable; see the warning above for the cause."</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -8360,10 +8348,6 @@ Results are limited to the 8 most recent quarters for relevance.</p>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>Earnings history for AAPL (most recent 3 quarters):
-  2026-06-30: EPS 2.02 vs estimate 1.88 (surprise: 7.4468%)
-  2026-03-31: EPS 2.01 vs estimate 1.94 (surprise: 3.6082%)
-  2025-12-31: EPS 2.84 vs estimate 2.67 (surprise: 6.367%)
-Earnings history for AAPL (most recent 3 quarters):
   2026-06-30: EPS 2.02 vs estimate 1.88 (surprise: 7.4468%)
   2026-03-31: EPS 2.01 vs estimate 1.94 (surprise: 3.6082%)
   2025-12-31: EPS 2.84 vs estimate 2.67 (surprise: 6.367%)
@@ -8494,8 +8478,10 @@ context that differentiates it from the EarningsAnalyzer.</p>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <hr/>
-<h2 id="5.-Workflow-1:-Prompt-Chaining">5. Workflow 1: Prompt Chaining<a class="anchor-link" href="#5.-Workflow-1:-Prompt-Chaining">¶</a></h2><p>The NewsProcessingChain processes raw news articles through five sequential stages.
-Each stage is a separate LLM call with the output passed as input to the next.</p>
+<h2 id="5.-Workflow-1:-Prompt-Chaining">5. Workflow 1: Prompt Chaining<a class="anchor-link" href="#5.-Workflow-1:-Prompt-Chaining">¶</a></h2><p>The NewsProcessingChain processes raw news articles through five sequential stages,
+with each stage's output passed as input to the next. Ingest retrieves articles
+from NewsAPI and Preprocess formats them as text; Classify, Extract, and
+Summarize are separate LLM calls.</p>
 <ol>
 <li><strong>Ingest</strong> -- retrieve raw articles from NewsAPI via <code>tools/news_data.fetch_news()</code></li>
 <li><strong>Preprocess</strong> -- convert articles into clean structured text</li>
@@ -8515,9 +8501,9 @@ Each stage is a separate LLM call with the output passed as input to the next.</
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># ── Workflow 1: Prompt Chaining ───────────────────────────────────────────────</span>
-<span class="c1"># NewsProcessingChain runs five sequential LLM calls, each building on the</span>
-<span class="c1"># previous stage's output. The chain is self-contained; news retrieval</span>
-<span class="c1"># occurs inside ingest() via tools/news_data.fetch_news().</span>
+<span class="c1"># NewsProcessingChain runs five sequential stages (three of them LLM calls),</span>
+<span class="c1"># each building on the previous stage's output. The chain is self-contained;</span>
+<span class="c1"># news retrieval occurs inside ingest() via tools/news_data.fetch_news().</span>
 <span class="c1"># See workflows/prompt_chain.py for full implementation.</span>
 
 <span class="n">chain</span> <span class="o">=</span> <span class="n">NewsProcessingChain</span><span class="p">(</span><span class="n">TICKER</span><span class="p">)</span>
@@ -8564,30 +8550,24 @@ Each stage is a separate LLM call with the output passed as input to the next.</
   Retrieved 10 articles
 
 Stage 2: Preprocess
-  Preprocessed text length: 6082 characters
+  Preprocessed text length: 6092 characters
 
 Stage 3: Classify
-  Classified text length: 2576 characters
+  Classified text length: 1578 characters
 
 Stage 4: Extract
-  Extracted text length: 2621 characters
+  Extracted text length: 2094 characters
 
 Stage 5: Summarize
-  Summary length: 1288 characters
+  Summary length: 1229 characters
 
 Chain output:
-Here is a concise summary of the key financial and business developments for Apple Inc. (AAPL) based strictly on the provided reports:
+Here is a concise factual summary of the recent material developments for Apple Inc. (AAPL):
 
-* **Stock Performance &amp; Analyst Rating:** 
-  * As of October 15, 2026, AAPL shares gained approximately 25% year-to-date, outperforming the S&amp;P 500 index (14% gain) by roughly 11 percentage points (*Biztoc.com*, Oct 15, 2026). 
-  * On October 12, 2026, JP Morgan raised its price target on AAPL stock by $20 to a new target of $360, maintaining a positive stance despite market concerns regarding production cuts (*9to5Mac*, Oct 12, 2026).
-
-* **Regulatory &amp; Product Developments:**
-  * CEO Tim Cook confirmed that Apple Intelligence features received regulatory approval in China, which drove AAPL shares higher in premarket trading (*Biztoc.com*, Oct 15, 2026).
-  * Bloomberg reported that Apple launched preorders for an updated Apple TV 4K and HomePod mini (*Biztoc.com*, Oct 12, 2026).
-
-* **Supply Chain &amp; Demand Challenges:**
-  * According to a Nikkei Asia report, Apple directed suppliers to cut October component production orders for the iPhone 18 Pro by 15% to 20%. The reduction was attributed to softer-than-expected demand caused by higher retail pricing, leading to a decline in AAPL stock following the report (*Biztoc.com*, Oct 9, 2026).
+* **Record Stock Close &amp; Earnings Outlook:** On October 16, 2026, AAPL reached a record closing price of $343.46 ahead of its November 2 earnings report. The rise coincided with discussions around iPhone Duo preorders and potential revenue from monetizing extra Siri AI features. Analyst targets reported include a Street Target of ~$329 and a Mid Target of ~$485, representing a potential 41% total return (*Biztoc.com*, Oct 17, 2026).
+* **2026 Market Outperformance:** As of October 15, 2026, AAPL stock gained approximately 25% year-to-date, outperforming the broader S&amp;P 500 index, which gained roughly 14% over the same period (*Biztoc.com*, Oct 15, 2026).
+* **China Regulatory Approval:** CEO Tim Cook confirmed that Apple Intelligence received regulatory approval for the Chinese market, which led to premarket price gains for AAPL stock (*Biztoc.com*, Oct 15, 2026).
+* **JP Morgan Price Target Increase:** JP Morgan raised its price target for AAPL by $20 to $360. This upward revision occurred despite broader market concerns, iPhone demand issues, and reported production cuts for the iPhone 18 Pro (*9to5Mac*, Oct 12, 2026).
 </pre>
 </div>
 </div>
@@ -8603,7 +8583,10 @@ Here is a concise summary of the key financial and business developments for App
 <hr/>
 <h2 id="6.-Workflow-2:-Routing-and-Specialist-Agents">6. Workflow 2: Routing and Specialist Agents<a class="anchor-link" href="#6.-Workflow-2:-Routing-and-Specialist-Agents">¶</a></h2><p>The ContentRouter classifies incoming financial content by type and dispatches
 to the appropriate specialist agent. Each specialist fetches its own data and
-produces a narrative analysis. Routing is based on content type, not data source.</p>
+produces a narrative analysis. Routing is based on content type, not data source.
+In the full pipeline (Section 11), the orchestrator invokes the three
+specialists directly because each one fetches its own data; the router is
+demonstrated here.</p>
 </div>
 </div>
 </div>
@@ -8657,38 +8640,47 @@ when content is classified as EARNINGS.</p>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Earnings analysis length: 2649 characters
+<pre>Earnings analysis length: 2456 characters
 
-Based on the provided quarterly financial data, here is an analysis of AAPL’s earnings performance, trends, and surprise patterns over the past 8 quarters.
+### **1. Earnings Trend**
+Over the past 8 quarters (Q4 FY24 through Q3 FY26), Apple demonstrated strong, accelerating earnings-per-share (EPS) growth, driven by typical holiday seasonality and robust year-over-year (YoY) expansion.
 
----
-
-### 1. Earnings Trends (Past 8 Quarters)
-* **Overall Trajectory:** AAPL has demonstrated robust diluted EPS expansion over the 8-quarter period, growing from $0.97 in the quarter ending September 30, 2024, to $2.02 in the quarter ending June 30, 2026.
-* **YoY EPS Growth Acceleration:** Year-over-year (YoY) comparisons show significant acceleration across corresponding quarters:
-  * **December Quarter (Holiday Peak):** EPS grew **18.3% YoY** from $2.40 (12/31/2024) to $2.84 (12/31/2025).
-  * **March Quarter:** EPS grew **21.8% YoY** from $1.65 (03/31/2025) to $2.01 (03/31/2026).
-  * **June Quarter:** EPS grew **28.7% YoY** from $1.57 (06/30/2025) to $2.02 (06/30/2026).
-  * **September Quarter:** EPS increased from $0.97 (09/30/2024) to $1.85 (09/30/2025).
-* **Seasonality Pattern:** The company consistently hits its peak EPS performance during the December fiscal first quarter (driven by holiday hardware sales), followed by normalized but structurally higher run-rate earnings in subsequent quarters.
+* **Seasonality:** Peak earnings consistently occur in the December quarter (Q1 FY25 EPS: $2.40; Q1 FY26 EPS: $2.84).
+* **YoY Acceleration:** EPS grew substantially across all comparable quarters:
+  * **December Quarter (Q1):** Expanded **+18.3%** YoY ($2.40 to $2.84).
+  * **March Quarter (Q2):** Expanded **+21.8%** YoY ($1.65 to $2.01).
+  * **June Quarter (Q3):** Expanded **+28.7%** YoY ($1.57 to $2.02).
+  * **September Quarter (Q4):** Jumped **+90.7%** YoY ($0.97 to $1.85), reflecting a normalization from Q4 FY24’s lower net income base.
 
 ---
 
-### 2. Revenue and Profit Margin Trajectory
-* **Data Availability:** *Note: Detailed income statements (revenue, gross profit, and operating income) were not provided in the dataset.*
-* **Inferred Operational Efficiency:** While specific revenue figures and margin percentages cannot be calculated directly without income statement line items, the sharp multi-quarter expansion in reported EPS—particularly during off-peak quarters like June 2026 ($2.02)—indicates strong bottom-line growth and likely expanding net margins or share repurchases driving per-share profitability.
+### **2. Revenue &amp; Profit Margin Trajectory**
+
+* **Revenue Growth:** Revenue followed a consistent expansion path, delivering steady high-teens YoY growth in 2026:
+  * **Dec 2025 (Q1 FY26):** $143.76B vs. $124.30B (+15.7% YoY)
+  * **Mar 2026 (Q2 FY26):** $111.18B vs. $95.36B (+16.6% YoY)
+  * **Jun 2026 (Q3 FY26):** $109.42B vs. $94.04B (+16.4% YoY)
+
+* **Gross Margin Expansion:** A key operational highlight is continuous gross margin expansion over the 8-quarter period:
+  * **Q4 FY24 (Sep 2024):** 46.22% ($43.88B on $94.93B revenue)
+  * **Q1 FY26 (Dec 2025):** 48.16% ($69.23B on $143.76B revenue)
+  * **Q3 FY26 (Jun 2026):** **50.06%** ($54.77B on $109.42B revenue), crossing the 50% milestone.
+
+* **Operating &amp; Net Margins:**
+  * **Operating Margin:** Ranged consistently between **30.0%** (Jun 2025) and a seasonal peak of **35.4%** (Dec 2025).
+  * **Net Margin:** Aside from Sep 2024 (15.5% due to non-operating items), net margins remained exceptionally stable within the **25.0%–29.3%** range.
 
 ---
 
-### 3. Earnings Surprises &amp; Beat Rate
-* **Consistency:** AAPL achieved a **100% beat rate** over the 8-quarter period, outperforming Wall Street consensus estimates in every single quarter.
-* **Magnitude Trend:** The magnitude of positive earnings surprises increased in the more recent fiscal periods:
-  * **Top Dollar Beats:** The largest absolute EPS upside occurred in the quarter ending **December 31, 2025** (reported $2.84 vs. $2.67 estimate, a **+$0.17** beat).
-  * **Top Percentage Beats:** 
-    1. **June 30, 2025:** +9.79% surprise ($1.57 reported vs. $1.43 estimated).
-    2. **June 30, 2026:** +7.45% surprise ($2.02 reported vs. $1.88 estimated).
-    3. **December 31, 2025:** +6.37% surprise ($2.84 reported vs. $2.67 estimated).
-* **Tightest Estimates:** The closest quarters to consensus were March 31, 2025 (+1.85% surprise) and September 30, 2024 (+2.11% surprise).
+### **3. Notable Earnings Surprises**
+Apple maintained a **100% beat rate** over the 8-quarter span, exceeding analyst EPS expectations in every reported period.
+
+* **Largest Absolute Beats:** 
+  * **Dec 31, 2025:** Beat by **$0.17** (+6.37% surprise), delivering $2.84 vs. $2.67 estimated.
+  * **Jun 30, 2026:** Beat by **$0.14** (+7.45% surprise), delivering $2.02 vs. $1.88 estimated.
+* **Largest Percentage Beats:** June quarters historically delivered the largest upside surprises relative to estimates:
+  * **Jun 30, 2025:** **+9.79%** beat ($1.57 reported vs. $1.43 estimated).
+  * **Jun 30, 2026:** **+7.45%** beat ($2.02 reported vs. $1.88 estimated).
 </pre>
 </div>
 </div>
@@ -8793,32 +8785,20 @@ router when content is classified as MARKET or MACRO.</p>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Market analysis length: 2221 characters
+<pre>Market analysis length: 1929 characters
 
-Here is an analysis of AAPL’s price action, technical positioning, and macroeconomic backdrop:
+### Market Analysis: Apple Inc. (AAPL)
 
----
+#### **1. Price Trend and Momentum**
+AAPL exhibits strong bullish momentum over the analyzed period in October 2026. Starting at $332.89 on October 5, the stock ascended to close at $343.46 by October 16, driven by a surge in buying pressure that pushed intraday highs near $348. Trading volume increased significantly during upward moves—peaking at 59.9 million shares on October 16 (well above its 44.5 million 50-day average)—confirming strong institutional participation and upward momentum.
 
-### **1. Price Trend &amp; Momentum**
-AAPL has demonstrated strong upward momentum over recent sessions, climbing from a close of **$332.89** on October 5 to **$343.46** on October 16 (a ~3.2% gain in under two weeks). 
-* **Momentum:** The stock hit a short-term peak of **$348.15** on October 13 before entering a slight consolidation phase in the $341–$343 range. 
-* **Volume:** Trading volume expanded significantly toward the end of the period, peaking at nearly **59.9 million shares** on October 16—well above the 44.45M daily average—indicating robust institutional participation and strong buying interest near high levels.
+#### **2. Position Relative to 52-Week Range**
+AAPL is trading near the extreme upper limit of its 52-week range ($243.42 – $348.15). At $343.46, the stock sits within **1.3% of its 52-week high** and **41.1% above its 52-week low**. Holding near historical highs reflects robust investor confidence and strong market leadership, placing the company’s market cap at approximately $5.01 trillion.
 
----
-
-### **2. Position Relative to 52-Week Range**
-AAPL is trading near the extreme top of its 52-week range (**$243.42 – $348.15**):
-* At **$343.46**, the stock sits within **1.35% of its 52-week high** and **41.1% above its 52-week low**.
-* Achieving a market capitalization of **$5.01 Trillion** reflects sustained market leadership and high investor demand, with price action holding firmly near multi-year record levels.
-
----
-
-### **3. Macroeconomic Context**
-The broader economic environment provides a supportive tailwind for Apple's business model and stock valuation:
-
-* **Interest Rates (Fed Funds Rate at 3.75%):** Interest rates have declined significantly from peak levels above 5.3% in early 2024 down to 3.75% by September 2026. A lower rate regime reduces discount rates on future earnings, directly benefiting mega-cap tech valuations like AAPL and supporting cash-flow multiples.
-* **Inflation (CPI at 336.3):** Consumer prices have stabilized with modest month-over-month growth throughout mid-to-late 2026. Controlled inflation preserves real consumer purchasing power while allowing Apple to maintain strong premium pricing power across its hardware and services ecosystem.
-* **Unemployment (4.2%):** The labor market remains tight and resilient, holding steady in the low 4% range. Stable employment levels support consumer confidence and discretionary spending, driving consistent demand for high-ticket electronics (iPhones, Macs) and recurring subscription services.
+#### **3. Macroeconomic Context**
+* **Interest Rates:** The Federal Funds Rate has declined substantially from peak levels of 5.33% in 2024 to 3.75% by September 2026. Lower interest rates reduce discount rates on future earnings, providing structural tailwinds for high-duration growth assets and expanding market valuation multiples for mega-cap tech stocks like AAPL.
+* **Unemployment &amp; Consumer Demand:** The unemployment rate remains historically low and stable at 4.2% (September 2026). A healthy labor market supports disposable income and consumer confidence, which are critical for sustaining demand for Apple's high-margin hardware and services ecosystem.
+* **Inflation (CPI):** Inflation has expanded moderately (CPI reached 336.30 in September 2026, roughly a 3.7% YoY increase). While persistent inflation elevates input and component costs, Apple's strong pricing power and brand equity generally allow it to pass cost increases to consumers without significantly dampening volume.
 </pre>
 </div>
 </div>
@@ -8871,48 +8851,39 @@ and key uncertainties. Dispatched by the router when content is classified as NE
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>News analysis length: 3517 characters
+<pre>News analysis length: 3249 characters
 
-### Executive Summary &amp; Stock Performance
+### Narrative Analysis: Apple Inc. (AAPL) Key Developments
 
-Despite macroeconomic headwinds, Apple Inc. (AAPL) has demonstrated strong market momentum in 2026, rising approximately 25% year-to-date—significantly outperforming the S&amp;P 500’s 14% gain over the same period. However, recent developments highlight a tug-of-war between near-term hardware demand soft spots and long-term expansion in artificial intelligence and ecosystem hardware.
+#### 1. Market Performance and Catalyst Momentum
+Apple Inc. (AAPL) has demonstrated strong momentum ahead of its November 2, 2026 earnings report, reaching a record closing high of $343.46 on October 16, 2026. The stock’s ~25% year-to-date gain significantly outperforms the broader S&amp;P 500 (~14%), driven primarily by investor optimism surrounding Apple's artificial intelligence (AI) roadmap—specifically plans to monetize expanded Siri features—and regulatory progress abroad. 
 
----
+#### 2. Key Growth Catalyst: China AI Approval
+A major material development is CEO Tim Cook’s confirmation that **Apple Intelligence has secured regulatory approval in China**. 
+* **Implications:** Securing approval in China eliminates a crucial regulatory roadblock in one of Apple’s largest and most competitive markets. It paves the way for the localized rollout of Apple's AI services, which could spur device upgrade cycles and drive software/services revenue in the region. 
 
-### Key Material Developments
-
-1. **Regulatory Green Light for Apple Intelligence in China**  
-   * **Development:** Reports indicate CEO Tim Cook confirmed that Apple has secured regulatory approval to deploy Apple Intelligence in China, sparking a premarket rally on October 15.
-   * **Implication:** Securing approval in China unlocks a crucial growth vector for Apple’s AI features in its second-largest market, potentially revitalizing regional upgrade cycles and supporting service revenues.
-
-2. **iPhone 18 Pro Component Order Cuts**  
-   * **Development:** *Nikkei Asia* reported on October 9 that Apple instructed suppliers to cut component production for October by 15% to 20% due to softer-than-expected demand for the premium iPhone 18 Pro.
-   * **Implication:** Lower demand for Apple's highest-margin iPhone variant presents a near-term revenue and average selling price (ASP) risk, generating temporary downward pressure on the stock.
-
-3. **Wall Street Confidence &amp; Smart Home Hardware Refreshes**  
-   * **Development:** On October 12, JP Morgan raised its price target on AAPL by $20 to $360, choosing to look past the reported supply chain adjustments. On the same day, Bloomberg’s Mark Gurman reported that Apple is preparing preorders for refreshed Apple TV 4K and HomePod mini models.
-   * **Implication:** Wall Street appears to view hardware supply cuts as temporary adjustments rather than structural demand declines. Simultaneously, smart home updates signal Apple's continued commitment to expanding its ambient ecosystem footprint.
+#### 3. Analyst Sentiment vs. Supply Chain Risks
+Despite supply chain headwinds, institutional outlooks remain generally optimistic:
+* **Analyst Actions:** JP Morgan raised its price target on AAPL by $20 to $360, reflecting confidence in the company's long-term trajectory.
+* **Supply Chain Disconnect:** The target upgrade occurred despite reports from *Nikkei Asia* pointing to potential production cuts for the iPhone 18 Pro and broader concerns regarding general iPhone demand. 
+* **Implications:** The market currently appears to be prioritizing software/AI catalysts and long-term ecosystem value over near-term hardware production adjustments. However, if hardware demand weakness persists or deepens, it could present downside risks to near-term earnings.
 
 ---
 
-### Material Implications &amp; Valuation Outlook
+### Fact vs. Speculation / Forward Estimates
 
-* **Short-Term Volatility vs. Long-Term Thesis:** The stock is caught between short-term hardware headwinds (iPhone 18 Pro component cuts) and major long-term structural catalysts (AI deployment in China and price target upgrades to $360). 
-* **Margin Impact:** Softer demand for the higher-priced iPhone 18 Pro could weigh on product gross margins in the near term, though this may be counterbalanced by expanded high-margin software/AI services as Apple Intelligence rolls out internationally.
+| Category | Item / Metric | Status |
+| :--- | :--- | :--- |
+| **Reported Fact** | Record close of $343.46 on Oct 16, 2026; YTD gain of ~25%; earnings scheduled for Nov 2, 2026. | Confirmed Market Data |
+| **Reported Fact** | CEO Tim Cook confirmed regulatory approval for Apple Intelligence in China. | Confirmed Corporate Announcement |
+| **Reported Fact** | JP Morgan increased its AAPL price target by $20 to $360. | Confirmed Analyst Action |
+| **Speculation / Unconfirmed Report** | Potential iPhone 18 Pro production cuts and softening consumer demand reported by *Nikkei Asia*. | Media/Supply Chain Rumor |
+| **Forward Projections** | Future monetization success of Siri AI features and target prices ranging from $329 (Street average) to $485. | Analyst Forecasts &amp; Estimates |
 
----
-
-### Critical Uncertainties and Fact vs. Speculation
-
-To properly assess risk, investors should distinguish between verified reported facts and market speculation:
-
-* **Reported Facts:** 
-  * AAPL’s 2026 YTD return (~25%) and JP Morgan’s price target change ($360).
-  * *Nikkei Asia*’s report detailing the 15%–20% October supplier component cuts.
-  * Reports confirming CEO Tim Cook’s statements regarding regulatory approval for Apple Intelligence in China.
-* **Key Uncertainties &amp; Speculation:**
-  * **Duration of Supply Cuts:** It remains uncertain whether the 15%–20% component cut reflects a sustained slowdown in premium iPhone demand or a temporary inventory adjustment by Apple logistics teams.
-  * **Monetization Timeline in China:** While regulatory approval for Apple Intelligence in China is confirmed, the precise release schedule and user adoption rate remain unquantified, leaving the immediate impact on upcoming quarterly earnings subject to speculation.
+### Key Uncertainties
+1. **Hardware Demand vs. AI Monetization:** Whether incoming revenue from Siri AI monetization can offset potential near-term hardware headwinds, such as the reported iPhone 18 Pro production adjustments.
+2. **Execution in China:** The timeline and adoption rate of Apple Intelligence features in China following regulatory approval, particularly given competition from local smartphone manufacturers.
+3. **Valuation:** With the stock ($343.46) trading above the Street's average price target (~$329), the upcoming November 2 earnings report will be critical in justifying current valuation levels.
 </pre>
 </div>
 </div>
@@ -8927,7 +8898,8 @@ To properly assess risk, investors should distinguish between verified reported 
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <h3 id="Routing-Demonstration">Routing Demonstration<a class="anchor-link" href="#Routing-Demonstration">¶</a></h3><p>The ContentRouter uses an LLM call at temperature 0.2 to classify content
 and dispatch to the correct specialist. The following demonstrates classification
-across all three content types.</p>
+across all four content types: EARNINGS, NEWS, MARKET, and MACRO. MARKET and
+MACRO content both route to the MarketAnalyzer.</p>
 </div>
 </div>
 </div>
@@ -8951,6 +8923,7 @@ across all three content types.</p>
     <span class="s2">"Apple reported EPS of 2.02, beating estimates of 1.88"</span><span class="p">,</span>
     <span class="s2">"Apple faces a 2.7 billion lawsuit over App Store tracking rules"</span><span class="p">,</span>
     <span class="s2">"Federal Reserve holds interest rates at 3.63 percent amid inflation concerns"</span><span class="p">,</span>
+    <span class="s2">"AAPL closed up 3 percent on trading volume of 60 million shares, above its 50-day average"</span><span class="p">,</span>
 <span class="p">]</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="s2">"Router classification test:"</span><span class="p">)</span>
@@ -8984,13 +8957,81 @@ across all three content types.</p>
   Input:      Federal Reserve holds interest rates at 3.63 percent amid in...
   Classified: MACRO -&gt; MarketAnalyzer
 
+  Input:      AAPL closed up 3 percent on trading volume of 60 million sha...
+  Classified: MARKET -&gt; MarketAnalyzer
+
 </pre>
 </div>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=478aa8fe">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=b42859d0">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h3 id="Routing-Dispatch">Routing Dispatch<a class="anchor-link" href="#Routing-Dispatch">¶</a></h3><p><code>route()</code> combines classification with dispatch: it classifies the content, then
+runs the matching specialist on the shared analysis dict. A fresh dict is used
+below so that the populated field shows which specialist received the content.
+<code>tests/test_router.py</code> (Section 12) additionally verifies, with mocked
+dependencies, that each content type reaches the correct specialist and
+populates only that specialist's field.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=75229ff6">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [15]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># ── Workflow 2: Routing Dispatch ─────────────────────────────────────────────</span>
+<span class="c1"># route() classifies the content, then runs the matching specialist on the</span>
+<span class="c1"># shared analysis dict. A fresh dict is passed in, so the field that gets</span>
+<span class="c1"># populated shows which specialist received the content. This call fetches</span>
+<span class="c1"># earnings data and makes LLM calls, so it takes a moment to run.</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">agents.schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">empty_analysis</span>
+
+<span class="n">routed</span> <span class="o">=</span> <span class="n">router</span><span class="o">.</span><span class="n">route</span><span class="p">(</span>
+    <span class="s2">"Apple reported EPS of 2.02, beating estimates of 1.88"</span><span class="p">,</span>
+    <span class="n">empty_analysis</span><span class="p">(</span><span class="n">TICKER</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Analysis fields after routing:"</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">field</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"earnings_analysis"</span><span class="p">,</span> <span class="s2">"news_analysis"</span><span class="p">,</span> <span class="s2">"market_analysis"</span><span class="p">):</span>
+    <span class="c1"># A non-empty string means the specialist that owns this field was run.</span>
+    <span class="n">status</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">routed</span><span class="p">[</span><span class="n">field</span><span class="p">])</span><span class="si">}</span><span class="s2"> characters"</span> <span class="k">if</span> <span class="n">routed</span><span class="p">[</span><span class="n">field</span><span class="p">]</span> <span class="k">else</span> <span class="s2">"empty"</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">field</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">status</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>  Router: classified as EARNINGS -&gt; EarningsAnalyzer
+
+Analysis fields after routing:
+  earnings_analysis: 2415 characters
+  news_analysis: empty
+  market_analysis: empty
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=31">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -8999,30 +9040,37 @@ across all three content types.</p>
 <hr/>
 <p>Sections 7 through 10 demonstrate each workflow pattern and agent function in
 isolation. The system's memory module persists analysis results across runs so
-the planner can address gaps identified in prior reflections. A pipeline run is
-executed below to populate memory with an initial analysis, giving the
-subsequent demos real prior context to work with. Section 11 then runs the
-full pipeline twice more to demonstrate how memory compounds across runs.</p>
+the planner can address gaps identified in prior reflections. A pipeline run
+(Run 1) is executed below to populate memory with an initial analysis, giving
+the subsequent demos real prior context to work with. Section 11 then runs the
+full pipeline two more times (Run 2 and Run 3) to demonstrate how memory
+compounds across runs.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=5a624982">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=32">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [15]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [16]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Seed memory with one pipeline run so Sections 7 through 10</span>
-<span class="c1"># have prior context to demonstrate against.</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Run 1 (seeding run): populate memory so Sections 7 through 10 have prior</span>
+<span class="c1"># context to demonstrate against. Section 11 continues the sequence as</span>
+<span class="c1"># Run 2 and Run 3.</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">agents.investment_agent</span><span class="w"> </span><span class="kn">import</span> <span class="n">InvestmentResearchAgent</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">memory.agent_memory</span><span class="w"> </span><span class="kn">import</span> <span class="n">clear_memory</span>
 
-<span class="n">clear_memory</span><span class="p">(</span><span class="n">TICKER</span><span class="p">)</span>  <span class="c1"># ensure clean starting point</span>
+<span class="c1"># Clear any memory left over from earlier sessions so Run 1 starts from a</span>
+<span class="c1"># known state and the three-run progression is reproducible.</span>
+<span class="n">clear_memory</span><span class="p">(</span><span class="n">TICKER</span><span class="p">)</span>
+
+<span class="c1"># Execute the full pipeline once and keep the result so Run 1's score can be</span>
+<span class="c1"># compared with Runs 2 and 3 in Section 11.</span>
 <span class="n">agent</span> <span class="o">=</span> <span class="n">InvestmentResearchAgent</span><span class="p">(</span><span class="n">TICKER</span><span class="p">)</span>
-<span class="n">agent</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Memory seeded for </span><span class="si">{</span><span class="n">TICKER</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
+<span class="n">analysis_run1</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Run 1 complete. Memory seeded for </span><span class="si">{</span><span class="n">TICKER</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -9036,66 +9084,98 @@ full pipeline twice more to demonstrate how memory compounds across runs.</p>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[1/7] Planning research for AAPL...
-      Research plan generated (3844 characters)
+      Research plan generated (4432 characters)
 [2/7] Running news processing chain...
-      Chain output: 1221 characters
+      Chain output: 1178 characters
 [3/7] Running EarningsAnalyzer...
 [4/7] Running NewsAnalyzer...
 [5/7] Running MarketAnalyzer...
 [6/7] Synthesizing analysis...
-      Synthesis: 5940 characters
+      Synthesis: 6941 characters
 [7/7] Evaluating and optimizing...
-      Analysis complete. Score: 9.0/10
-Memory seeded for AAPL.
+      Analysis complete. Score: 9.5/10
+Run 1 complete. Memory seeded for AAPL.
 </pre>
 </div>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=31">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=33">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="7.-Workflow-3:-Evaluator-Optimizer">7. Workflow 3: Evaluator-Optimizer<a class="anchor-link" href="#7.-Workflow-3:-Evaluator-Optimizer">¶</a></h2><p>The EvaluatorOptimizer evaluates the synthesized analysis on a 0-10 scale and
-refines it iteratively until the quality threshold is met or the maximum number
-of iterations is exhausted. A rubric-anchored prompt is used to reduce LLM
-evaluator bias toward round numbers and range compression.</p>
+<h2 id="7.-Workflow-3:-Evaluator-Optimizer">7. Workflow 3: Evaluator-Optimizer<a class="anchor-link" href="#7.-Workflow-3:-Evaluator-Optimizer">¶</a></h2><p>The EvaluatorOptimizer evaluates the synthesized analysis on a 0-10 scale, then
+refines it using the evaluator's feedback. In the pipeline, <code>run()</code> repeats this
+cycle until the score reaches the quality threshold (7.0) or the maximum number
+of iterations (3) is exhausted. A rubric-anchored prompt defines what each score
+level means, and a 10-point interval scale was selected because interval scales
+were more self-consistent than Likert or binary scales for most of the models
+compared in a study of LLM evaluators (Lee et al., 2024). Because the evaluator
+is itself an LLM, re-scoring identical text can return a different value.</p>
+<p>The demonstration below uses the synthesis saved by Run 1. It first walks through
+one explicit evaluate, refine, and re-evaluate cycle, then shows the loop control
+that <code>run()</code> applies in the pipeline. The Step 1 score can differ from the score
+the pipeline assigned to the same synthesis in Run 1 above.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=32">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=34">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [16]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [17]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Section 7 -- Workflow 3: Evaluator-Optimizer</span>
-<span class="c1"># Demonstrate the evaluator-optimizer in isolation using the most recent</span>
-<span class="c1"># analysis saved to memory, without running the full pipeline.</span>
+<span class="c1"># Demonstrate the generate -&gt; evaluate -&gt; refine -&gt; re-evaluate cycle in</span>
+<span class="c1"># isolation. The synthesis saved to memory by Run 1 stands in for the</span>
+<span class="c1"># "generate" step, so the full pipeline does not need to run again.</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">workflows.evaluator_optimizer</span><span class="w"> </span><span class="kn">import</span> <span class="n">EvaluatorOptimizer</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">memory.agent_memory</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_memory</span>
 
-<span class="c1"># Load prior analysis to use as input for the evaluator demo</span>
+<span class="c1"># Load the analysis saved by the most recent pipeline run (Run 1 at this point)</span>
 <span class="n">prior</span> <span class="o">=</span> <span class="n">load_memory</span><span class="p">(</span><span class="n">TICKER</span><span class="p">)</span>
 
 <span class="k">if</span> <span class="ow">not</span> <span class="n">prior</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"No prior analysis found for </span><span class="si">{</span><span class="n">TICKER</span><span class="si">}</span><span class="s2"> -- run Section 11 first."</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"No prior analysis found for </span><span class="si">{</span><span class="n">TICKER</span><span class="si">}</span><span class="s2"> -- run the Run 1 cell above first."</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
-    <span class="c1"># Run evaluator-optimizer with default threshold (7.0) and max iterations (3)</span>
-    <span class="n">evaluator</span> <span class="o">=</span> <span class="n">EvaluatorOptimizer</span><span class="p">(</span><span class="n">TICKER</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">7.0</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
-    <span class="n">result</span> <span class="o">=</span> <span class="n">evaluator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
+    <span class="n">evaluator</span> <span class="o">=</span> <span class="n">EvaluatorOptimizer</span><span class="p">(</span><span class="n">TICKER</span><span class="p">)</span>
+    <span class="n">original</span> <span class="o">=</span> <span class="n">prior</span><span class="p">[</span><span class="s2">"synthesis"</span><span class="p">]</span>
 
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"=== Evaluator-Optimizer Results ==="</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Final score:     </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">'evaluation_score'</span><span class="p">]</span><span class="si">}</span><span class="s2">/10"</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Feedback length: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s1">'evaluation_feedback'</span><span class="p">])</span><span class="si">}</span><span class="s2"> characters"</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Feedback summary (first 500 chars):"</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s2">"evaluation_feedback"</span><span class="p">][:</span><span class="mi">500</span><span class="p">])</span>
+    <span class="c1"># Step 1: evaluate the saved synthesis. evaluate() returns a 0-10 score and</span>
+    <span class="c1"># the evaluator's written feedback.</span>
+    <span class="n">score_before</span><span class="p">,</span> <span class="n">feedback</span> <span class="o">=</span> <span class="n">evaluator</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">original</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"=== Step 1: Evaluate ==="</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Score: </span><span class="si">{</span><span class="n">score_before</span><span class="si">}</span><span class="s2">/10"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Feedback length: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">feedback</span><span class="p">)</span><span class="si">}</span><span class="s2"> characters"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Feedback (first 500 chars):"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">feedback</span><span class="p">[:</span><span class="mi">500</span><span class="p">])</span>
+
+    <span class="c1"># Step 2: refine the synthesis using that feedback. refine() makes a second</span>
+    <span class="c1"># LLM call that revises the text to address the feedback.</span>
+    <span class="n">refined</span> <span class="o">=</span> <span class="n">evaluator</span><span class="o">.</span><span class="n">refine</span><span class="p">(</span><span class="n">original</span><span class="p">,</span> <span class="n">feedback</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">=== Step 2: Refine ==="</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Synthesis length: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">original</span><span class="p">)</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">refined</span><span class="p">)</span><span class="si">}</span><span class="s2"> characters"</span><span class="p">)</span>
+
+    <span class="c1"># Step 3: re-evaluate the refined synthesis. The score is not guaranteed to</span>
+    <span class="c1"># rise, because the evaluator is itself an LLM.</span>
+    <span class="n">score_after</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">evaluator</span><span class="o">.</span><span class="n">evaluate</span><span class="p">(</span><span class="n">refined</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">=== Step 3: Re-evaluate ==="</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Score: </span><span class="si">{</span><span class="n">score_after</span><span class="si">}</span><span class="s2">/10"</span><span class="p">)</span>
+
+    <span class="c1"># Loop control: run() applies the same cycle with a stopping rule. It</span>
+    <span class="c1"># evaluates, stops once the score reaches the threshold, and otherwise</span>
+    <span class="c1"># refines and re-evaluates up to max_iterations. A copy of the analysis is</span>
+    <span class="c1"># passed so the saved memory entry is not modified.</span>
+    <span class="n">loop</span> <span class="o">=</span> <span class="n">EvaluatorOptimizer</span><span class="p">(</span><span class="n">TICKER</span><span class="p">,</span> <span class="n">threshold</span><span class="o">=</span><span class="mf">7.0</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">loop</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">prior</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">=== Loop control (threshold 7.0, max 3 iterations) ==="</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Final score: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">'evaluation_score'</span><span class="p">]</span><span class="si">}</span><span class="s2">/10"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -9108,23 +9188,31 @@ evaluator bias toward round numbers and range compression.</p>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>=== Evaluator-Optimizer Results ===
-Final score:     9.5/10
-Feedback length: 1373 characters
-
-Feedback summary (first 500 chars):
+<pre>=== Step 1: Evaluate ===
+Score: 8.5/10
+Feedback length: 1714 characters
+Feedback (first 500 chars):
 
 
 **Strengths:**
-* **Rigorous Separation of Fact vs. Speculation:** Section 3 provides an exemplary structured table clearly distinguishing confirmed corporate/institutional facts (e.g., CEO statements, price target revisions) from third-party media rumors (e.g., Nikkei Asia and Bloomberg reports).
-* **Mathematical Accuracy &amp; Grounding:** Financial calculations are accurate based on the provided data (e.g., accurate YoY EPS growth percentages, percentage distance to 52-week peak, and multi-week 
+* **Fact vs. Speculation Framework:** Section 4 cleanly separates verified operational metrics (e.g., 8-quarter beat history, 50.06% gross margin) from speculative claims (e.g., unconfirmed iPhone 18 Pro supply cuts, potential Siri monetization), demonstrating strong analytical rigor.
+* **Quantitative Precision:** The analysis uses specific metrics across revenue growth, operating/gross margin expansion (e.g., +384 bps expansion), stock technicals, and macroeconomic conditions (
+
+=== Step 2: Refine ===
+Synthesis length: 6941 -&gt; 9666 characters
+
+=== Step 3: Re-evaluate ===
+Score: 9.0/10
+
+=== Loop control (threshold 7.0, max 3 iterations) ===
+Final score: 9.0/10
 </pre>
 </div>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=33">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=35">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9138,12 +9226,12 @@ analyses.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=34">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=36">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [17]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [18]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Section 8 -- Agent Function: Planning</span>
@@ -9179,81 +9267,86 @@ analyses.</p>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Prior memory found for AAPL (score: 9.0/10)
-Planner will address gaps from: 2026-10-17T11:12:59.230044
+<pre>Prior memory found for AAPL (score: 9.5/10)
+Planner will address gaps from: 2026-10-18T08:48:57.332279
 
 === Research Plan ===
-### AAPL Focused Research Plan
+# Focused Research Plan: Apple Inc. (AAPL)
 
-To build upon the prior analysis (Score: 9.0/10) and explicitly address previous analytical gaps—specifically deepening the forward-looking margin stress tests, supply chain noise disentanglement, and valuation mechanics at the $5T+ market cap level—this research plan outlines targeted focus areas across three core domains.
-
----
-
-### 1. Gap Mitigation &amp; Specific Focus Areas
-* **Supply Chain Rumor vs. Operational Reality:** Reconcile third-party component cut reports (e.g., Nikkei Asia) against official channel checks, supplier earnings (TSMC, Foxconn), and management guidance to filter out noise from actual demand shifts.
-* **Services Growth &amp; Margin Accretion Mechanics:** Perform a granular segment analysis of Services (App Store, iCloud, Apple Pay, Licensing) to evaluate gross margin expansion dynamics and regulatory headwinds (e.g., EU DMA, US DOJ antitrust lawsuit).
-* **Valuation Stress Testing at Peak Multiples:** Test valuation sustainability ($340+ share price, ~$5T market cap) using a multi-scenario DCF and historical relative valuation multiples (NTM P/E, EV/EBITDA, FCF yield) against megacap peer baselines.
+**Prior Analysis Assessment &amp; Core Objective:**  
+While the prior report achieved a strong baseline (9.5/10), it relied on high-level operational momentum and headline margin expansion (&gt;50%). To elevate this research to a top-tier institutional standard, this plan addresses specific gaps: quantifying the ROI and timeline of Apple Intelligence CapEx, stress-testing segment margins under regulatory pressures (EU DMA / DOJ antitrust), analyzing China unit volume vs. pricing mix, and applying rigorous valuation sensitivity modeling.
 
 ---
 
-### 2. Earnings &amp; Financial Performance
-* **Revenue Drivers &amp; Upgrade Cycle Trajectory:**
-  * Analyze recent quarterly iPhone revenue growth and hardware mix shift toward Pro/Pro Max models.
-  * Evaluate trailing and projected 8-quarter EPS growth momentum to assess execution consistency.
-* **Margin Analysis:**
-  * Track Product Gross Margins vs. Services Gross Margins over the past 4–8 quarters.
-  * Evaluate the impact of rising memory/component costs and localized manufacturing shifts (India/Vietnam) on overall gross margin.
-* **Capital Return &amp; Cash Flow:**
-  * Measure Free Cash Flow (FCF) generation capability, share repurchase pacing, and dividend sustainability.
+## 1. Earnings &amp; Financial Performance Deep-Dive
+
+*   **Gross Margin Quality &amp; Sustainability:**
+    *   Deconstruct the recent move to &gt;50% gross margins: Isolate the impact of high-margin Services mix shift vs. Hardware structural cost improvements (e.g., custom Apple Silicon cost savings).
+    *   Evaluate potential margin compression risks from rising memory/component costs and elevated supply chain diversification expenses (India/Vietnam expansion).
+*   **Segment Mechanics &amp; Revenue Drivers:**
+    *   Analyze iPhone pricing dynamics: Separate average selling price (ASP) expansion (Pro/Pro Max mix) from underlying volume growth across key geographies.
+    *   Assess Services trajectory: Evaluate high-margin streams (App Store, iCloud, Licensing) vs. lower-margin streams (Apple TV+, Music) to determine long-term margin trajectory.
+*   **Earnings Quality &amp; Capital Allocation:**
+    *   Audit cash flow quality: Compare Free Cash Flow (FCF) conversion rates against net income over the past 8 quarters.
+    *   Model share repurchase efficiency: Evaluate capital deploy effectiveness at elevated P/E multiples and its impact on EPS growth relative to organic net income expansion.
 
 ---
 
-### 3. Recent News &amp; Strategic Developments
-* **Apple Intelligence &amp; AI Commercialization:**
-  * Monitor progress on global AI rollouts, specifically tracking China CAC regulatory approvals and localization partnerships.
-  * Evaluate monetization potential (monetized API/Services tier vs. hardware upgrade catalyst).
-* **Regulatory &amp; Legal Landscape:**
-  * Assess status and potential financial impact of the US DOJ antitrust lawsuit and European Union Digital Markets Act enforcement on App Store fee structures.
+## 2. Product Pipeline, AI Strategy &amp; News Dynamics
+
+*   **Apple Intelligence &amp; Monetization Timeline:**
+    *   Quantify CapEx trends linked to AI infrastructure (direct buildout vs. cloud partner hosting) relative to revenue generation timelines.
+    *   Differentiate between marketing-driven upgrade cycle narratives and concrete consumer upgrade signals (e.g., carrier trade-in intensity, residual value curves).
+*   **Regulatory &amp; Antitrust Impact Analysis:**
+    *   **US DOJ Antitrust &amp; Google TAC:** Model scenarios detailing earnings exposure if Google Traffic Acquisition Costs (TAC) payments ($20B+ annually) are altered or curtailed by judicial remedies.
+    *   **EU Digital Markets Act (DMA):** Quantify fee erosion and third-party app store leakage risks in Europe, establishing a base-case and downside impact on Services margins.
+*   **Geographic Risk &amp; Supply Chain Execution:**
+    *   Analyze China localized performance: Differentiate total revenue growth from market share metrics against native OEMs (Huawei, Xiaomi).
+    *   Track supply chain migration metrics: Measure progress, yields, and margin drag associated with scaling production capacity in India and Vietnam.
 
 ---
 
-### 4. Market &amp; Macro Context
-* **Macro Dynamics &amp; FX Exposure:**
-  * Evaluate consumer spending trends in key geographic segments (Greater China, North America, Europe).
-  * Quantify foreign exchange (FX) headwinds/tailwinds on reported international top-line growth.
-* **Relative Performance &amp; Positioning:**
-  * Compare YTD performance, earnings revision trends, and valuation multiples relative to S&amp;P 500 and Big Tech peers.
+## 3. Market, Macro &amp; Valuation Sensitivity Analysis
+
+*   **Valuation Stress-Testing:**
+    *   Build a sensitivity matrix (DCF &amp; Multiple-based) testing target valuations against varying scenarios:
+        *   *Terminal Growth:* 2.5% to 4.0%
+        *   *WACC:* 7.5% to 9.5% (reflecting interest rate scenarios)
+        *   *Services Growth Drag:* Account for potential loss of search TAC revenue.
+    *   Compare AAPL's current valuation premium against Mega-Cap Tech peers relative to consensus medium-term EPS growth (PEG ratio).
+*   **Macro Factor Analysis:**
+    *   Assess consumer credit conditions and high-end discretionary spending power across North America and Europe.
+    *   Measure foreign exchange (FX) tailwinds/headwinds on international revenues and hedging efficacy.
+*   **Institutional Positioning &amp; Options Market Setup:**
+    *   Analyze options positioning (implied volatility skew, put-call ratios) leading into the November 2, 2026 earnings report to identify market-implied move expectations vs. historical post-earnings realization.
 
 ---
 
-### Research Execution Protocol
-1. **Fact vs. Speculation Categorization:** Explicitly flag all unconfirmed news/supply-chain rumors vs. SEC filings, company earnings calls, and official regulatory statements.
-2. **Quantitative Validation:** Back all structural narrative shifts (e.g., "AI driving upgrade cycles") with concrete financial metrics (ASP changes, segment growth rates, GM expansion bps).
+## Deliverable Goal
+Synthesize these inputs into a definitive, institutional-grade equity research report that pairs narrative catalysts with rigorous, scenario-tested financial modeling.
 </pre>
 </div>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=35">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=37">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <hr/>
-<h2 id="9.-Agent-Function:-Self-Reflection">9. Agent Function: Self-Reflection<a class="anchor-link" href="#9.-Agent-Function:-Self-Reflection">¶</a></h2><p>After synthesis and evaluation, the InvestmentResearchAgent reflects on the
-quality of its own output, scoring completeness, factual grounding, and clarity.
-The reflection narrative is persisted to memory for use in future runs.</p>
+<h2 id="9.-Agent-Function:-Self-Reflection">9. Agent Function: Self-Reflection<a class="anchor-link" href="#9.-Agent-Function:-Self-Reflection">¶</a></h2><p>After synthesis and evaluation, the InvestmentResearchAgent reflects on the quality of its own output, identifying what was covered well, what was missing, and priorities for the next run. The reflection narrative is persisted to memory for use in future runs.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=36">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=38">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [18]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [19]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Section 9 -- Agent Function: Self-Reflection</span>
@@ -9268,7 +9361,7 @@ The reflection narrative is persisted to memory for use in future runs.</p>
 <span class="c1"># Load the most recent analysis from memory to reflect on</span>
 <span class="n">prior</span> <span class="o">=</span> <span class="n">load_memory</span><span class="p">(</span><span class="n">TICKER</span><span class="p">)</span>
 <span class="k">if</span> <span class="ow">not</span> <span class="n">prior</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"No prior analysis found for </span><span class="si">{</span><span class="n">TICKER</span><span class="si">}</span><span class="s2"> -- run Section 11 first."</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"No prior analysis found for </span><span class="si">{</span><span class="n">TICKER</span><span class="si">}</span><span class="s2"> -- run the Run 1 cell above first."</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
     <span class="n">reflection</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">reflect</span><span class="p">(</span><span class="n">prior</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">"=== Self-Reflection ==="</span><span class="p">)</span>
@@ -9286,81 +9379,74 @@ The reflection narrative is persisted to memory for use in future runs.</p>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>=== Self-Reflection ===
-### Reflection &amp; Critique of Investment Analysis
+This self-reflective analysis reviews the AAPL equity research synthesis. Overall, the analysis provides a high-conviction, balanced assessment of Apple Inc. leading into its late-2026 earnings release, earning its **9.5/10** score primarily through its factual discipline and clear risk framing.
+
+Below is a structured breakdown of what worked, what was omitted, and how to improve future research iterations.
 
 ---
 
-### 1. What Was Covered Well
+### 1. What Was Covered Well (Key Strengths)
 
-* **Rigorous Fact vs. Speculation Framework:** The matrix in Section 3 is an industry best practice. Distinguishing Tim Cook’s confirmed China regulatory statements from Nikkei Asia’s unconfirmed supply chain reports prevents overreacting to noisy, third-party channel checks.
-* **Precise EPS &amp; Beat Tracking:** The quarter-by-quarter EPS trend and YoY acceleration metrics are mathematically sound and highlight Apple’s multi-year execution beat rate (8/8 quarters).
-* **Contextual Macro Integration:** Connecting the Fed Funds rate easing cycle (3.6%–3.75%) to high-duration megacap equity valuations grounds AAPL’s price action ($343.46 near record highs) in broader liquidity dynamics.
-* **Balanced Risk-Reward Structure:** The synthesis effectively weighs fundamental upside drivers (China AI rollout, macro tailwinds) against top-line hardware risks (iPhone 18 Pro cuts) and tight valuation margins (1.4% below 52-week peak).
+* **Analytical Discipline (Fact vs. Speculation Framework):** Section 4’s side-by-side matrix is the report's strongest asset. By explicitly isolating verified metrics (50.06% gross margin, 8-quarter beat record) from market noise (*Nikkei Asia* supply chain rumors, Siri monetization timing), the report protects the investment thesis from confirmation bias.
+* **Margin Dynamics &amp; Revenue Isolation:** The research accurately identified the non-linear relationship between revenue acceleration and EPS growth, correctly calling out and normalizing the Q4 FY24 one-off tax charge to avoid skewing baseline net margin trends.
+* **Macroeconomic and Equity Market Alignment:** Rather than treating AAPL in a vacuum, the report effectively linked top-line performance to consumer strength (4.2% unemployment) and lower discount rate pressure (3.75% Fed Funds Rate), contextualizing why the equity can sustain premium valuations.
+* **Catalyst Localization:** Identifying the regulatory approval of Apple Intelligence in China as a localized catalyst directly addresses AAPL’s primary operational vulnerability—defending Greater China market share against domestic original equipment manufacturers (OEMs).
 
 ---
 
-### 2. Missing Data &amp; Omitted Perspectives
+### 2. Missing Data &amp; Blind Spots (Gaps)
 
-#### A. Financial &amp; Segment Granularity
-* **Top-Line Revenue &amp; Segment Split:** The analysis focuses heavily on bottom-line EPS, obscuring whether EPS growth is driven by organic top-line expansion, mix shift, or share count reduction. Crucially missing:
-  * **Services vs. Hardware breakdown:** Services revenue growth rate, recurring revenue mix, and gross margin differential relative to hardware.
-  * **Product category performance:** Individual performance trends for iPhone, Mac, iPad, and Wearables.
-* **Gross &amp; Operating Margins:** Consolidated Gross Margin (%) and Services Gross Margin (%) trends are missing. Margin expansion is central to Apple’s software-driven re-rating thesis.
+While the high-level financial tracking is strong, several key equity research elements were underrepresented or omitted:
 
-#### B. Valuation Multiples &amp; Relative Valuation
-* While absolute metrics ($343.46 share price, $5.01T market cap) are present, **relative valuation metrics** are completely omitted:
-  * Forward P/E, P/S, EV/EBITDA, and PEG ratios relative to historical 5-year averages.
-  * Valuation comparison against megacap peers (e.g., MSFT, GOOGL, NVDA).
+#### A. Segment Revenue Decomposition
+* **The Gap:** The report attributes gross margin expansion to "Services and product mix," but lacks specific segment figures. 
+* **Impact:** Without broken-out growth rates for **Services vs. Hardware** (iPhone, Mac, iPad, Wearables/Home/Accessories), it is difficult to determine whether margin expansion was driven by structural high-margin software growth or favorable lower-cost components in hardware.
 
-#### C. Capital Allocation Metrics
-* Share repurchases are credited for driving EPS growth, but the report lacks:
-  * **Free Cash Flow (FCF) yield** and annual cash conversion.
-  * Specific dollar amounts allocated to buybacks and dividends, along with the percentage reduction in diluted share count YoY.
+#### B. Capital Return &amp; Free Cash Flow (FCF) Mechanics
+* **The Gap:** No mention of capital allocation—specifically share buybacks, cash conversion, or dividend distributions.
+* **Impact:** For a enterprise valued at $5.01 trillion, share repurchases are a primary driver of EPS growth. Neglecting share count contraction obscures whether EPS outperformance is driven by net income expansion or capital efficiency.
 
-#### D. Regulatory &amp; Geopolitical Headwinds
-* While China AI regulatory *approval* is noted, key systemic risks are unmentioned:
-  * **App Store / Regulatory Pressure:** EU Digital Markets Act (DMA) compliance costs, anti-steering enforcement, and DOJ antitrust litigation risks.
-  * **Supply Chain Concentration:** Geographic diversification progress (India/Vietnam) versus ongoing reliance on Taiwanese semiconductor fabrication and Chinese assembly.
+#### C. Absolute &amp; Relative Valuation Multiples
+* **The Gap:** The analysis notes a $5.01T market cap and a $343.46 stock price, but omits core valuation multiples such as **Forward P/E, P/FCF, EV/EBITDA, or PEG ratios**.
+* **Impact:** Highlighting a stock near 52-week highs without assessing its multiple relative to historical averages or Big Tech peers leaves the "valuation risk" argument incomplete.
+
+#### D. Geopolitical &amp; Supply Chain Diversification Context
+* **The Gap:** Beyond unconfirmed production cuts, the report overlooks Apple’s ongoing supply chain realignments (e.g., manufacturing capacity shifts to India and Vietnam) and competitive dynamics against domestic Chinese peers (e.g., Huawei, Xiaomi).
 
 ---
 
 ### 3. Priorities for the Next Analysis Run
 
-To move from a **9.0/10** to an institutional-grade report, prioritize the following updates:
+To elevate future AAPL research to an institutional, buy-side level, prioritize the following enhancements:
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                   NEXT ANALYSIS RUN: PRIORITY ROADMAP                   │
-└─────────────────────────────────────────────────────────────────────────┘
-                                     │
-     ┌───────────────────────────────┼───────────────────────────────┐
-     ▼                               ▼                               ▼
-1. Revenue &amp; Margins          2. Capital Return &amp;          3. Valuation &amp; Peers
-   • Segment Breakdown           Cash Flow                   • Forward P/E &amp; FCF Yield
-   • Gross Margin %              • FCF Conversion            • Peer Relative Table
-   • Hardware vs Services        • Share Count % Reduction   • Regulatory Risk Matrix
++-----------------------------------+-----------------------------------------------------------------------+
+| Research Focus                    | Actionable Implementation for Next Coverage Cycle                      |
++-----------------------------------+-----------------------------------------------------------------------+
+| 1. Granular Segment Matrix        | • Disaggregate Revenue &amp; Gross Margin across iPhone, Services, Mac,    |
+|                                   |   iPad, and Wearables.                                                |
+|                                   | • Track Services ARR (Annual Recurring Revenue) &amp; Paid Subscriptions.  |
++-----------------------------------+-----------------------------------------------------------------------+
+| 2. Capital Allocation &amp; FCF       | • Quantify FCF Generation, Share Repurchase run-rates, and basic vs.  |
+|                                   |   diluted share count reduction per quarter.                          |
++-----------------------------------+-----------------------------------------------------------------------+
+| 3. Advanced Valuation Framework   | • Model Forward P/E against 3-year historical medians.                |
+|                                   | • Compare AAPL's PEG ratio against Magnificent 7 / Mega-Cap Tech.     |
++-----------------------------------+-----------------------------------------------------------------------+
+| 4. Supply Chain &amp; Geo-Tracking    | • Map geo-revenue shifts (Greater China vs. Rest of Asia/Americas).   |
+|                                   | • Track production volume shifts (India/Vietnam output % vs. China).   |
++-----------------------------------+-----------------------------------------------------------------------+
 ```
 
-1. **Incorporate Segment &amp; Margin Performance Data:**
-   * Add a summary table detailing Revenue ($B), YoY Growth (%), and Gross Margin (%) broken down by **Hardware (iPhone, Mac, iPad, Wearables)** vs. **Services**.
-   * Clarify the portion of EPS growth driven by organic net income vs. share count reduction via buybacks.
-
-2. **Add a Valuation &amp; Cash Flow Matrix:**
-   * Include Forward P/E, Trailing P/E, Price/FCF, and FCF Yield alongside 5-year historical medians.
-   * Compare AAPL's key valuation metrics directly against Big Tech peers.
-
-3. **Expand Regulatory &amp; Legal Risk Assessment:**
-   * Add a dedicated risk section addressing App Store take-rate vulnerabilities, DMA implications in Europe, and supply chain concentration risks outside China.
-
-4. **Refine Seasonal EPS Language:**
-   * Distinguish clearly between **sequential seasonal dips** (e.g., Q1 holiday peak to Q2/Q3) and **YoY structural expansion** to avoid implying linear quarter-over-quarter growth.
+### Summary Conclusion
+The current report serves as an executive-ready macro and financial overview. By integrating **segment-level revenue attribution**, **capital return dynamics**, and **standard valuation multiples** in the next cycle, the coverage will provide a complete buy/sell/hold decision framework.
 </pre>
 </div>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=37">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=39">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9374,17 +9460,17 @@ research strategy and address prior gaps.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=38">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=40">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [19]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [20]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Section 10 -- Agent Function: Memory</span>
 <span class="c1"># Demonstrate the memory module in isolation: inspect the persisted entry</span>
-<span class="c1"># for the current ticker and show the planner will use on the next run.</span>
+<span class="c1"># for the current ticker and show what the planner will use on the next run.</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">memory.agent_memory</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_memory</span>
 
@@ -9400,7 +9486,7 @@ research strategy and address prior gaps.</p>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">This entry will be passed to the planner on the next run"</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"to address gaps identified in the reflection."</span><span class="p">)</span>
 <span class="k">else</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"No memory found for </span><span class="si">{</span><span class="n">TICKER</span><span class="si">}</span><span class="s2"> -- run Section 11 first."</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"No memory found for </span><span class="si">{</span><span class="n">TICKER</span><span class="si">}</span><span class="s2"> -- run the Run 1 cell above first."</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -9414,10 +9500,10 @@ research strategy and address prior gaps.</p>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>Most recent memory entry for AAPL:
-  Timestamp:        2026-10-17T11:12:59.230044
-  Evaluation score: 9.0/10
-  Synthesis length: 5940 characters
-  Reflection saved: 3791 characters
+  Timestamp:        2026-10-18T08:48:57.332279
+  Evaluation score: 9.5/10
+  Synthesis length: 6941 characters
+  Reflection saved: 4647 characters
 
 This entry will be passed to the planner on the next run
 to address gaps identified in the reflection.
@@ -9427,7 +9513,7 @@ to address gaps identified in the reflection.
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=39">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=41">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -9436,29 +9522,29 @@ to address gaps identified in the reflection.
 <hr/>
 <h2 id="11.-Full-Pipeline:-InvestmentResearchAgent">11. Full Pipeline: InvestmentResearchAgent<a class="anchor-link" href="#11.-Full-Pipeline:-InvestmentResearchAgent">¶</a></h2><p>The InvestmentResearchAgent orchestrates the complete research pipeline in a
 single <code>agent.run()</code> call. To demonstrate Agent Function: Memory, the pipeline
-is run twice. Run 1 reads memory from the seeding run executed before Section 7
-and generates a research plan targeting prior gaps. Run 2 reads the memory and
-reflection saved by Run 1, allowing the planner to address identified gaps.</p>
+is run three times in total. The seeding run before Section 7 is Run 1.
+Run 2 reads Run 1's memory and generates a research plan targeting prior gaps.
+Run 3 reads Run 2's memory and reflection, allowing the planner to address
+identified gaps across three compounding iterations.</p>
 <p>Note: This notebook uses live API data. Re-execution will produce different
 outputs as market data, news, and macro indicators change over time. The
 memory file (<code>data/agent_memory.json</code>) is gitignored and not included in
-the repository; it is created at runtime and persists between runs within
-a local environment.</p>
+the repository; it is created at runtime. The Run 1 cell clears any existing
+memory for the ticker at the start of each full notebook run, so the
+three-run progression always begins from a known state.</p>
 <pre><code>Ticker Input
     |
 Planning (reads memory)
     |
-Dynamic Tool Use (4 APIs)
+Prompt Chain (Workflow 1): Ingest &gt; Preprocess &gt; Classify &gt; Extract &gt; Summarize
+(retrieves news via NewsAPI; its output feeds the NewsAnalyzer)
     |
-Prompt Chain (Workflow 1)
-    |
-Routing (Workflow 2)
-    |
-Specialist Agents (Earnings, News, Market)
+Specialist Agents (Earnings, News, Market) with Dynamic Tool Use
     |
 Synthesis
     |
-Evaluator-Optimizer (Workflow 3)
+Evaluator-Optimizer (Workflow 3): evaluate &gt; refine &gt; re-evaluate,
+until the score reaches the threshold (default 7.0) or 3 iterations
     |
 Self-Reflection
     |
@@ -9466,40 +9552,43 @@ Memory Write
     |
 Final Investment Analysis Report
 </code></pre>
+<p>The ContentRouter (Workflow 2) is demonstrated in Section 6. In this pipeline,
+the orchestrator invokes the three specialists directly, since each one fetches
+its own data.</p>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=40">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=42">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="Run-1:-Memory-Informed-Analysis">Run 1: Memory-Informed Analysis<a class="anchor-link" href="#Run-1:-Memory-Informed-Analysis">¶</a></h3><p>Run 1 reads the memory saved by the seeding run and generates a research
+<h3 id="Run-2:-Memory-Informed-Analysis">Run 2: Memory-Informed Analysis<a class="anchor-link" href="#Run-2:-Memory-Informed-Analysis">¶</a></h3><p>Run 2 reads the memory saved by the seeding run (Run 1) and generates a research
 plan that addresses gaps identified in the prior reflection. Results are
-saved to memory for Run 2 to build on.</p>
+saved to memory for Run 3 to build on.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=42">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=43">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [20]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [21]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Run 1 -- reads seeded memory from earlier in the notebook</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Run 2 -- reads seeded memory from the pipeline run before Section 7</span>
 <span class="n">agent</span> <span class="o">=</span> <span class="n">InvestmentResearchAgent</span><span class="p">(</span><span class="n">TICKER</span><span class="p">)</span>
-<span class="n">analysis_run1</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<span class="n">analysis_run2</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
 
 <span class="nb">print</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">"=== Run 1 Results ==="</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Evaluation score: </span><span class="si">{</span><span class="n">analysis_run1</span><span class="p">[</span><span class="s1">'evaluation_score'</span><span class="p">]</span><span class="si">}</span><span class="s2">/10"</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Synthesis length: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">analysis_run1</span><span class="p">[</span><span class="s1">'synthesis'</span><span class="p">])</span><span class="si">}</span><span class="s2"> characters"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"=== Run 2 Results ==="</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Evaluation score: </span><span class="si">{</span><span class="n">analysis_run2</span><span class="p">[</span><span class="s1">'evaluation_score'</span><span class="p">]</span><span class="si">}</span><span class="s2">/10"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Synthesis length: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">analysis_run2</span><span class="p">[</span><span class="s1">'synthesis'</span><span class="p">])</span><span class="si">}</span><span class="s2"> characters"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">analysis_run1</span><span class="p">[</span><span class="s2">"synthesis"</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">analysis_run2</span><span class="p">[</span><span class="s2">"synthesis"</span><span class="p">])</span>
 </pre></div>
 </div>
 </div>
@@ -9513,131 +9602,115 @@ saved to memory for Run 2 to build on.</p>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[1/7] Planning research for AAPL...
-      Research plan generated (3696 characters)
+      Research plan generated (4323 characters)
 [2/7] Running news processing chain...
-      Chain output: 1445 characters
+      Chain output: 1236 characters
 [3/7] Running EarningsAnalyzer...
 [4/7] Running NewsAnalyzer...
 [5/7] Running MarketAnalyzer...
 [6/7] Synthesizing analysis...
-      Synthesis: 6468 characters
+      Synthesis: 6590 characters
 [7/7] Evaluating and optimizing...
-      Analysis complete. Score: 8.5/10
+      Analysis complete. Score: 8.0/10
 
-=== Run 1 Results ===
-Evaluation score: 8.5/10
-Synthesis length: 6468 characters
+=== Run 2 Results ===
+Evaluation score: 8.0/10
+Synthesis length: 6590 characters
 
-# Investment Analysis: Apple Inc. (AAPL)
+# Comprehensive Investment Analysis: Apple Inc. (AAPL)
+
+---
 
 ## Executive Summary
-Apple Inc. (AAPL) exhibits robust fundamental momentum, supported by strong year-over-year earnings expansion, a perfect quarterly beat track record over the past eight quarters, and positive macroeconomic tailwinds. Shares are trading near historic highs ($343.46, just 1.35% below the 52-week high of $348.15), outperforming the broader market with a ~25% YTD gain compared to the S&amp;P 500's ~14%. 
 
-Long-term growth prospects are bolstered by Tim Cook’s confirmed regulatory approval for Apple Intelligence in China and potential ecosystem expansion into smart home hardware. However, near-term hardware revenue faces potential pressure due to reported component order cuts for the iPhone 18 Pro. 
+Apple Inc. (AAPL) presents a strong fundamental profile backed by an extraordinary 8-quarter track record of earnings beats, multi-year gross margin expansion, and solid macroeconomic tailwinds. With a market capitalization surpassing **$5.01 trillion**, AAPL is currently trading near its 52-week high following a ~25% year-to-date gain (outperforming the S&amp;P 500’s 14% gain). 
 
----
-
-## 1. Financial Performance &amp; Earnings Momentum
-
-### Earnings Expansion &amp; Beat Dynamics
-AAPL has demonstrated strong earnings power over the eight-quarter period ending Q3 Fiscal 2026 (June 2026):
-* **Consistent YoY Growth:** EPS expanded across all comparable periods, headlined by a **+90.7%** YoY increase in the September 2025 quarter ($1.85 vs. $0.97) and a **+28.7%** increase in the June 2026 quarter ($2.02 vs. $1.57).
-* **Defying Seasonality:** In the most recent quarter (June 30, 2026), EPS reached $2.02, expanding sequentially from $2.01 in March 2026 and resisting typical mid-year seasonal slowing.
-* **Expanding Upside Surprises:** AAPL achieved a **100% beat rate** over the past 8 quarters. Beat magnitudes accelerated from an average surprise range of ~2.1%–2.6% in late 2024/early 2025 to ~4.5%–9.8% over the four quarters ending mid-2026. The June 2026 quarter reported an EPS surprise of +7.45% (+$0.14 above the $1.88 estimate).
-
-```
-Quarterly EPS Trend (YoY Expansion):
-- Sept Quarter:  $0.97 (2024) ➔ $1.85 (2025) [+90.7%]
-- Dec Quarter:   $2.40 (2024) ➔ $2.84 (2025) [+18.3%]
-- Mar Quarter:   $1.65 (2025) ➔ $2.01 (2026) [+21.8%]
-- Jun Quarter:   $1.57 (2025) ➔ $2.02 (2026) [+28.7%]
-```
-
-### Profitability Drivers
-While specific income statement line items (Revenue, Gross Margins, Net Income) were not provided, the sustained trajectory in EPS indicates accelerating underlying earnings power—driven by operational leverage, net income expansion, and/or share repurchase execution.
+Key fundamental growth drivers include expanding top-line revenue across both holiday and off-peak quarters, gross margins breaching **50%** in Q3 FY26, and critical regulatory approval for **Apple Intelligence** in China. However, near-term volatility surrounding reported iPhone 18 Pro production adjustments and the unconfirmed timeline for monetization of AI features require a balanced perspective heading into the upcoming November 2 earnings release.
 
 ---
 
-## 2. Strategic Growth Catalysts &amp; News Developments
+## Financial Performance &amp; Margin Trajectory
 
-1. **Apple Intelligence Approval in China:**
-   * Tim Cook confirmed regulatory approval for Apple Intelligence in China. This strategically crucial win opens up AI suite features in one of Apple’s largest, most competitive markets, potentially stimulating hardware upgrade cycles and ecosystem service monetization.
-2. **Smart Home Hardware Expansion:**
-   * Media reports indicate upcoming announcements and preorders for refreshed Apple TV 4K and HomePod mini devices, reinforcing consumer lock-in and offering incremental hardware growth.
-3. **Wall Street Re-ratings:**
-   * Reflecting confidence in software services, AI monetisation, and overall execution, JP Morgan raised its price target for AAPL by $20 to **$360**.
+### 1. Steady Revenue &amp; EPS Acceleration
+Over the 8-quarter observation window (Q4 FY24 through Q3 FY26), Apple demonstrated consistent top-line growth and operational efficiency:
+* **Beat Rate:** Apple achieved a **100% EPS beat rate** across all 8 quarters. Notably, earnings beats widened in late FY25/FY26, averaging ~6.8% over the last three reported quarters compared to ~1.8%–2.6% in earlier periods.
+* **Revenue Expansion:** YoY quarterly revenue growth accelerated across off-peak and peak periods, highlighted by December quarter (Q1) revenue expanding 15.7% YoY to **$143.76B** in Q1 FY26, and June quarter (Q3) revenue rising 16.4% YoY to **$109.42B** in Q3 FY26.
+* **EPS Growth:** Reported EPS expanded from $0.97 in Q4 FY24 to $2.02 in off-peak Q3 FY26, reaching a peak holiday level of **$2.84** in Q1 FY26 (+18.3% YoY).
 
----
-
-## 3. Market Context &amp; Macroeconomic Environment
-
-### Price Action &amp; Technical Momentum
-* **Current Price:** $343.46 (as of mid-October 2026), up from $332.89 on October 5.
-* **52-Week Range:** $243.42 – $348.15. The current price sits **1.35%** below its record high.
-* **Institutional Demand:** Trading volume reached nearly **60 million shares** on October 16, comfortably outpacing the 30-day average volume of **44.45 million shares**, indicating strong buying interest.
-
-### Macroeconomic Tailwinds
-* **Declining Interest Rates:** The Federal Funds Rate fell from over 5.3% in 2024 to **3.63%–3.75%** in late 2026. Lower discount rates support expanded valuation multiples for mega-cap growth stocks like AAPL while reducing capital costs.
-* **Pricing Power vs. Inflation:** Consumer Price Index (CPI) expanded moderately in 2026 (from 326.59 in Jan to 336.30 in Sept). Apple’s premium market positioning offers pricing power to help mitigate rising input/component costs.
-* **Resilient Consumer Base:** A tight labor market (unemployment steady at **4.1%–4.2%**) maintains steady consumer disposable income, underpinning demand for premium device upgrades and services subscriptions.
+### 2. Multi-Year Margin Expansion
+Apple’s profitability profile showed structural enhancement across all profit metrics:
+* **Gross Margins:** Expanded by **384 basis points**, climbing from 46.22% in September 2024 to **50.06%** in June 2026, driven by higher-margin revenue streams and operational efficiencies.
+* **Operating Margins:** Maintained a resilient floor above 32% in FY26 off-peak quarters, while peaking at 35.37% during high-volume December quarters.
+* **Net Margins:** Consistently ranged between **24.9% and 29.3%** (excluding the Q4 FY24 anomaly of 15.52%, which was temporarily depressed by $14.74B in non-operating/tax items).
 
 ---
 
-## 4. Key Risks &amp; Uncertainties
+## Strategic Developments &amp; Operational Catalysts
 
-* **iPhone 18 Pro Order Cuts:** Nikkei Asia reported a **15% to 20% cut** in October component orders for the flagship iPhone 18 Pro due to softer demand tied to higher pricing points. This presents near-term risks to flagship hardware revenue and Average Selling Price (ASP) targets.
-* **Unquantified AI Monetization:** Although Apple Intelligence secured regulatory approval in China, the rate of user adoption and the direct net impact on top-line financials remain unquantified.
+* **Apple Intelligence Approval in China:** CEO Tim Cook confirmed regulatory approval for Apple Intelligence in China. Securing clearance in this critical, competitive market removes a key hurdle for Apple's global AI rollout and helps safeguard high-end hardware market share.
+* **Siri AI Monetization Potential:** Management is actively discussing monetizing advanced Siri features. If executed, a subscription or tiered payment structure for AI capabilities could expand Apple's high-margin Services revenue.
+* **iPhone Production Uncertainty:** Recent volatility has been fueled by reports of production cuts for the iPhone 18 Pro. It remains unclear whether these cuts reflect high-end demand softness, supply chain component constraints, or routine inventory management.
 
 ---
 
-## 5. Fact vs. Speculation Breakdown
+## Market Context, Technical Momentum &amp; Macro Backdrop
 
-To maintain an objective investment assessment, confirmed factual data must be distinguished from market speculation:
+### 1. Price Momentum &amp; Technical Positioning
+* **Current Trading Level:** AAPL traded at **$343.46** as of October 16, 2026, roughly **1.35% below its 52-week high** of $348.15 (set October 13) and 41.1% above its 52-week low ($243.42).
+* **Institutional Accumulation:** The stock demonstrated strong short-term upward momentum in October (+3.2% from Oct 5 to Oct 16), accompanied by volume spikes up to ~60 million shares (well above the 3-month average of 44.45 million), signaling robust institutional buying.
+* **Analyst Targets:** Wall Street consensus averages around **$329** (with a mid-target reference near $485). Following recent strength, JP Morgan raised its target to **$360**.
 
-| Verified Facts | Media/Market Speculation &amp; Uncertainties |
-| :--- | :--- |
-| **100% EPS beat rate** across 8 consecutive quarters. | Whether 15–20% component cuts stem from **soft consumer demand** vs. **tactical supply chain adjustments**. |
-| **YTD outperformance** of ~25% vs. S&amp;P 500 (~14%). | The exact **timing and launch schedule** of refreshed smart home hardware (based on Bloomberg reports). |
-| **Tim Cook's confirmation** of Apple Intelligence approval in China. | The **financial rate of return/adoption rate** of Apple Intelligence in China. |
-| **JP Morgan PT increase** by $20 to $360. | |
-| **Federal Funds Rate cut** to 3.63%–3.75%. | |
+### 2. Macroeconomic Tailwinds
+* **Interest Rates:** A declining Federal Funds Rate (dropping from 5.33% in early 2024 to **3.75%** by September 2026) lowers discount rates on tech cash flows, supporting elevated P/E multiples and easing capital expenditures.
+* **Inflation:** Consumer Price Index (CPI) growth stabilized in mid-to-late 2026 (holding between 332–336), helping protect hardware margins against rising supply chain costs.
+* **Labor Market:** A low, steady unemployment rate (**4.2%** as of September 2026) sustains consumer disposable income, fueling hardware replacement cycles and Services spending.
+
+---
+
+## Key Risks &amp; Fact vs. Speculation
+
+| Perspective | Validated Facts | Unresolved Uncertainties &amp; Speculation |
+| :--- | :--- | :--- |
+| **Growth &amp; AI Strategy** | Regulatory approval for Apple Intelligence in China confirmed by CEO Tim Cook. | Siri monetization is currently under internal discussion; commercial launch details and revenue impacts remain speculative. |
+| **Supply Chain &amp; Demand** | 100% earnings beat rate over 8 quarters; gross margins reached 50.06% in Q3 FY26. | Cause of reported iPhone 18 Pro production cuts is unconfirmed (demand softness vs. component bottlenecks vs. rebalancing). |
+| **Valuation &amp; Trading** | Market cap &gt; $5.01T; stock trades ~1.35% below all-time highs with expanding volume. | Current pricing sits above the broader consensus Street target ($329), leaving less margin for error if Q4 guidance disappoints. |
 
 ---
 
 ## Overall Investment Considerations
 
-* **Bull Case:** Accelerating EPS growth, sequential momentum defying seasonal trends, expanding quarterly beats, and the major catalyst of Apple Intelligence in China. Macroeconomic lower interest rates provide multiple expansion support, while strong volume confirms institutional backing toward a target of $360.
-* **Bear Case / Near-Term Caution:** High price elasticity on flagship hardware (evidenced by reported iPhone 18 Pro component cuts) and near-term price proximity to 52-week highs ($343.46 vs. $348.15 peak) leave little room for execution missteps.
+* **Bull Case:** Apple combines elite financial execution (perfect 8-quarter beat record, gross margins &gt;50%) with powerful strategic tailwinds (China AI clearance, potential Siri recurring revenue). A supportive macro environment (3.75% rate regime, low inflation, low unemployment) provides strong valuation backing near all-time highs.
+* **Bear/Caution Case:** Trading near peak valuation levels ($343.46) exposes the stock to downside risk if the reported iPhone 18 Pro production cuts signal weakening high-end consumer demand. Furthermore, the stock is currently trading above the consensus target of $329, raising the bar for upcoming earnings reports.
 
-**Conclusion:** Apple remains a fundamentally strong mega-cap growth compounder. Investors should balance strong earnings momentum and positive AI regulatory progress against potential near-term hardware revenue friction from flagship price sensitivity.
+**Synthesis:** AAPL remains a fundamental powerhouse with accelerating EPS beats and expanding operating leverage. Investors heading into the November 2 earnings report should weigh Apple's impressive operational discipline and macro tailwinds against potential short-term volatility tied to iPhone supply chain adjustments and high valuation expectations.
 </pre>
 </div>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=43">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=44">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="Agent-Function:-Memory">Agent Function: Memory<a class="anchor-link" href="#Agent-Function:-Memory">¶</a></h3><p>Run 1 is complete. The analysis has been saved to <code>data/agent_memory.json</code>,
+<h3 id="Agent-Function:-Memory">Agent Function: Memory<a class="anchor-link" href="#Agent-Function:-Memory">¶</a></h3><p>Run 2 is complete. The analysis has been saved to <code>data/agent_memory.json</code>,
 keyed by ticker. The memory entry includes the synthesis, evaluation score,
-reflection, and timestamp. Run 2's planner will read this entry and incorporate
+reflection, and timestamp. Run 3's planner will read this entry and incorporate
 the prior reflection to address identified gaps.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=44">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=45">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [21]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [22]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Show memory saved by Run 1</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Show memory saved by Run 2</span>
 <span class="n">prior</span> <span class="o">=</span> <span class="n">load_memory</span><span class="p">(</span><span class="n">TICKER</span><span class="p">)</span>
 <span class="k">if</span> <span class="n">prior</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Memory entry for </span><span class="si">{</span><span class="n">TICKER</span><span class="si">}</span><span class="s2">:"</span><span class="p">)</span>
@@ -9660,48 +9733,49 @@ the prior reflection to address identified gaps.</p>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>Memory entry for AAPL:
-  Timestamp:        2026-10-17T11:15:15.933647
-  Evaluation score: 8.5/10
-  Synthesis length: 6468 characters
-  Reflection saved: 4667 characters
+  Timestamp:        2026-10-18T08:51:54.292774
+  Evaluation score: 8.0/10
+  Synthesis length: 6590 characters
+  Reflection saved: 3585 characters
 </pre>
 </div>
 </div>
 </div>
 </div>
 </div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=45">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=46">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="Run-2:-Memory-Informed-Analysis">Run 2: Memory-Informed Analysis<a class="anchor-link" href="#Run-2:-Memory-Informed-Analysis">¶</a></h3><p>The planner reads the memory saved by Run 1 and incorporates the prior
+<h3 id="Run-3:-Memory-Informed-Analysis">Run 3: Memory-Informed Analysis<a class="anchor-link" href="#Run-3:-Memory-Informed-Analysis">¶</a></h3><p>The planner reads the memory saved by Run 2 and incorporates the prior
 reflection into its research strategy, demonstrating Agent Function: Memory.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=46">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=47">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [22]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [23]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Run 2 -- planner reads Run 1 memory</span>
-<span class="n">analysis_run2</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Run 3 -- planner reads Run 2 memory</span>
+<span class="n">analysis_run3</span> <span class="o">=</span> <span class="n">agent</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
 
 <span class="nb">print</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">"=== Run 2 Results ==="</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Evaluation score: </span><span class="si">{</span><span class="n">analysis_run2</span><span class="p">[</span><span class="s1">'evaluation_score'</span><span class="p">]</span><span class="si">}</span><span class="s2">/10"</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Synthesis length: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">analysis_run2</span><span class="p">[</span><span class="s1">'synthesis'</span><span class="p">])</span><span class="si">}</span><span class="s2"> characters"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"=== Run 3 Results ==="</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Evaluation score: </span><span class="si">{</span><span class="n">analysis_run3</span><span class="p">[</span><span class="s1">'evaluation_score'</span><span class="p">]</span><span class="si">}</span><span class="s2">/10"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Synthesis length: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">analysis_run3</span><span class="p">[</span><span class="s1">'synthesis'</span><span class="p">])</span><span class="si">}</span><span class="s2"> characters"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">analysis_run2</span><span class="p">[</span><span class="s2">"synthesis"</span><span class="p">])</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">analysis_run3</span><span class="p">[</span><span class="s2">"synthesis"</span><span class="p">])</span>
 <span class="nb">print</span><span class="p">()</span>
 <span class="nb">print</span><span class="p">(</span><span class="s2">"=== Score Comparison ==="</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Run 1: </span><span class="si">{</span><span class="n">analysis_run1</span><span class="p">[</span><span class="s1">'evaluation_score'</span><span class="p">]</span><span class="si">}</span><span class="s2">/10"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Run 2: </span><span class="si">{</span><span class="n">analysis_run2</span><span class="p">[</span><span class="s1">'evaluation_score'</span><span class="p">]</span><span class="si">}</span><span class="s2">/10"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Run 3: </span><span class="si">{</span><span class="n">analysis_run3</span><span class="p">[</span><span class="s1">'evaluation_score'</span><span class="p">]</span><span class="si">}</span><span class="s2">/10"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -9715,123 +9789,102 @@ reflection into its research strategy, demonstrating Agent Function: Memory.</p>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>[1/7] Planning research for AAPL...
-      Research plan generated (3875 characters)
+      Research plan generated (3302 characters)
 [2/7] Running news processing chain...
-      Chain output: 1130 characters
+      Chain output: 1096 characters
 [3/7] Running EarningsAnalyzer...
 [4/7] Running NewsAnalyzer...
 [5/7] Running MarketAnalyzer...
 [6/7] Synthesizing analysis...
-      Synthesis: 7378 characters
+      Synthesis: 6550 characters
 [7/7] Evaluating and optimizing...
       Analysis complete. Score: 9.0/10
 
-=== Run 2 Results ===
+=== Run 3 Results ===
 Evaluation score: 9.0/10
-Synthesis length: 7378 characters
+Synthesis length: 6550 characters
 
-# Comprehensive Investment Analysis: Apple Inc. (AAPL)
-
-## Executive Summary
-Apple Inc. (AAPL) demonstrates robust fundamentals, strong quarterly earnings expansion, and sustained market leadership, highlighted by a market capitalization exceeding **$5.01 trillion**. Over the analyzed 8-quarter period through Q3 FY26, Apple maintained a perfect **100% earnings beat rate**, with year-over-year EPS growth accelerating across off-peak and seasonal peak quarters alike. 
-
-Despite unconfirmed supply chain reports regarding near-term iPhone 18 Pro production cuts, investor sentiment remains bullish. Key strategic tailwinds—most notably confirmed regulatory approval for **Apple Intelligence in China**—and a supportive macroeconomic environment (easing Federal Reserve interest rates) have driven AAPL to trade near historical highs (**$343.46**, approximately 1.3% below its 52-week high of $348.15). Year-to-date, AAPL has returned ~25%, outperforming the S&amp;P 500 by roughly 11 percentage points.
+# Investment Research Analysis: Apple Inc. (AAPL)
 
 ---
 
-## 1. Financial Performance &amp; Earnings Trajectory
+### **Executive Summary**
+Apple Inc. (AAPL) enters late 2026 displaying fundamental strength, marked by top-line growth re-acceleration into mid-teens percentage gains, unprecedented gross margin expansion (reaching **50.1%** in Q3 FY26), and an **8-for-8 quarter EPS beat record**. This fundamental turn is mirrored technically, with AAPL trading near its 52-week high at **$343.46** and crossing a **$5 Trillion market capitalization** on heavy volume.
 
-### Perfect Beat Track Record &amp; EPS Expansion
-Apple delivered an exceptional track record of execution over the 8-quarter period ending Q3 FY26, beating consensus earnings estimates in **8 out of 8 quarters**. Notably, positive surprise margins expanded over time, moving from modest beats (+1.85% to +2.56%) in late FY24/early FY25 to substantial beats in FY26.
-
-* **Seasonal Peak (Q1 / December Quarters):** EPS grew from **$2.40** (Q1 FY25) to **$2.84** (Q1 FY26), representing an **18.3% YoY** increase. Q1 FY26 marked the largest absolute surprise, exceeding consensus by **+$0.17** (+6.37%).
-* **Off-Peak Momentum:**
-  * **Q4 (September):** Rose from **$0.97** (2024) to **$1.85** (2025), a **+90.7% YoY** surge.
-  * **Q2 (March):** Rose from **$1.65** (2025) to **$2.01** (2026), a **+21.8% YoY** increase.
-  * **Q3 (June):** Rose from **$1.57** (2025) to **$2.02** (2026), a **+28.7% YoY** increase, beating estimates by **+$0.14** (+7.45%).
-
-### Implied Fundamentals
-While granular income statement line items (gross revenues, operating expenses, net margins) were omitted from the dataset, the consistent double-digit YoY expansion in EPS—coupled with sustained baseline earnings above $2.00 in off-peak quarters—points to strong top-line momentum, margin resilience, or accretive share buyback execution.
+The macro environment provides strong support, characterized by declining interest rates (**3.75%** Fed Funds rate), low unemployment (**4.1%–4.2%**), and inflation resilience supported by Apple's strong pricing power. Major near-term catalysts include regulatory approval for Apple Intelligence in China and robust consumer interest in iPhone Duo preorders. However, a balanced view requires weighing these drivers against reported hardware supply chain risks (iPhone 18 Pro production cuts), unconfirmed monetization models for AI features, and a wide analyst target price dispersion.
 
 ---
 
-## 2. Key News, Catalysts &amp; Strategic Developments
+### **1. Financial Performance &amp; Earnings Trajectory**
 
-### **Confirmed Fact vs. Market Speculation**
+#### **Top-Line Acceleration &amp; Margin Expansion**
+* **Revenue Re-acceleration:** Apple transitioned from single-digit YoY growth in late FY25 (+7.9% in Sep 2025) to sustained mid-teens revenue growth through FY26:
+  * **Q1 FY26 (Dec 2025):** $143.76B (+15.7% YoY)
+  * **Q2 FY26 (Mar 2026):** $111.18B (+16.6% YoY)
+  * **Q3 FY26 (Jun 2026):** $109.42B (+16.4% YoY)
+* **Structural Gross Margin Gains:** Gross margin expanded steadily across eight quarters from **46.2%** in Sep 2024 to **50.1%** in Jun 2026, marking the first time gross margins crossed the 50% threshold in this period.
+* **Operating &amp; Net Margins:** Operating margins in non-holiday quarters improved from ~30.0% in mid-2025 to **32.6%** in Jun 2026 (peaking at **35.4%** in the Dec 2025 holiday quarter). Standard net margins normalized between **25.0% and 27.2%** (expanding to ~29.3% in holiday periods; Sep 2024 net margin of 15.5% was affected by a temporary tax impact).
 
-| Strategic Event | Category | Analytical Context &amp; Impact |
+#### **EPS Growth &amp; Earnings Beat Momentum**
+* **Earnings Expansion:** Non-holiday base EPS increased from $1.57–$1.65 in early FY25 to $2.01–$2.02 in mid-FY26 (~28% YoY growth). Peak holiday EPS rose from $2.40 (Dec 2024) to $2.84 (Dec 2025).
+* **Surprise Consistency:** AAPL beat consensus EPS estimates in **100% of the past 8 quarters**, with surprise margins widening in FY26 (e.g., +9.79% in Jun 2025, +6.37% in Dec 2025, and +7.45% in Jun 2026).
+
+---
+
+### **2. Strategic Growth Catalysts &amp; News Flow**
+
+* **Apple Intelligence Clearance in China:** CEO Tim Cook confirmed regulatory approval for Apple Intelligence in China. This eliminates a significant geopolitical barrier, positioning Apple to roll out its core AI suite in a major competitive hardware market to stimulate local upgrade cycles.
+* **Product Demand:** Early demand momentum ahead of the November 2 earnings report is being driven by iPhone Duo preorders and optimism around the broader AI software roadmap.
+* **Analyst Sentiment &amp; Valuation Targets:** 
+  * JP Morgan raised its price target to **$360**.
+  * Street reported targets show a target price of **~$329** alongside a higher mid-target price of **~$485** (representing up to ~41% potential total return).
+
+---
+
+### **3. Technical Dynamics &amp; Macro Context**
+
+#### **Trading &amp; Technical Profile**
+* **Price &amp; Performance:** AAPL reached a record closing high of **$343.46** on October 16, 2026, up ~25% YTD (outperforming the S&amp;P 500 at ~14%).
+* **Range Position:** Trading at **~96%** of its 52-week range ($243.42 – $348.15), sitting just 1.35% below its all-time high.
+* **Volume Confirmation:** On October 16, daily volume jumped to **59.9M shares**, well above the 3-month average of **44.45M shares**, confirming strong institutional buying pressure behind the breakout.
+
+#### **Macroeconomic Tailwinds**
+* **Monetary Policy:** Fed rate cuts from peak levels of 5.33% to **3.75%** lower discount rates in equity valuation models, supporting higher target multiples for mega-cap technology companies.
+* **Consumer Health:** Low unemployment (**4.1%–4.2%**) maintains disposable income for premium hardware purchases and recurring Services.
+* **Inflation &amp; Pricing Power:** Even with CPI rising to 336.30, Apple’s expanded gross margins (50.1%) demonstrate its capacity to absorb or pass along cost pressure without sacrificing profitability.
+
+---
+
+### **4. Key Risks &amp; Fact vs. Speculation**
+
+1. **Siri AI Monetization Strategy (Speculation):**
+   * *Fact:* Reports are circulating regarding potential paid features for enhanced Siri AI.
+   * *Uncertainty:* The pricing structure, business model, and consumer adoption rates remain strictly unconfirmed. Monetizing Siri is currently speculative.
+2. **Hardware Supply Chain Risk (Uncertainty):**
+   * *Fact:* Nikkei Asia reported potential production cuts for the iPhone 18 Pro.
+   * *Uncertainty:* If hardware demand slows, unconfirmed production cuts present downside risks to future hardware revenue, margin stability, and supply chain commitments.
+3. **Valuation Target Dispersion:**
+   * *Fact:* Street price targets diverge significantly between the average target (~$329) and elevated mid-targets (~$485).
+   * *Implication:* The spread reflects debate among analysts regarding how quickly Apple can translate its AI strategy into tangible income growth.
+
+---
+
+### **Synthesis &amp; Investment Summary**
+
+| Investment Pillar | Bullish Factors | Bearish / Risk Factors |
 | :--- | :--- | :--- |
-| **China AI Approval** | **Confirmed Fact** | CEO Tim Cook confirmed regulatory approval for "Apple Intelligence" in China. This eliminates a critical regulatory hurdle, protecting market share against Chinese smartphone rivals and opening up upgrade cycle monetization in a key market. |
-| **Analyst Price Target Revisions** | **Confirmed Fact** | JP Morgan raised its price target on AAPL by $20 to **$360 per share** on October 12, citing confidence in long-term earnings, margin durability, and services growth. |
-| **iPhone 18 Pro Production Trims** | *Unconfirmed Speculation / Media Report* | Reports on October 9 indicated Apple requested a 15%–20% reduction in October component orders for the iPhone 18 Pro due to price-sensitive demand friction. Apple has not confirmed these supply chain reports. |
-| **Ecosystem Hardware Refresh** | *Unconfirmed Speculation / Media Report* | Media reports point to upcoming refreshes for Apple TV 4K and HomePod mini. While minor revenue contributors compared to iPhone, they reinforce consumer ecosystem lock-in. |
+| **Financials** | Mid-teens revenue growth; Gross margins &gt;50%; 100% EPS beat rate over 8 quarters. | Potential margin compression if lower-margin hardware segments grow or production declines. |
+| **Catalysts** | Apple Intelligence approved in China; strong iPhone Duo preorders. | Siri monetization model is unproven/speculative; Nikkei report of iPhone 18 Pro cuts. |
+| **Technical/Macro** | Trading near 52-wk high ($343.46); volume surge; rate cuts (3.75%); Market Cap &gt;$5T. | Trading near top of range (~96%) leaves low technical margin for error ahead of earnings. |
 
-### Strategic Takeaway on Hardware vs. Margin Friction
-A key market dynamic is the divergence between potential short-term hardware unit volume friction (due to higher premium model pricing) and long-term earnings confidence. Even if component trims occur, Wall Street analysts appear confident that high pricing power, margin expansion, and high-margin services growth will offset near-term unit volume headwinds.
-
----
-
-## 3. Market Dynamics &amp; Macroeconomic Backdrop
-
-### Price Action &amp; Technical Posture
-* **Current Share Price:** $343.46 (as of October 16, 2026)
-* **52-Week Trading Range:** $243.42 – $348.15
-* **Market Capitalization:** ~$5.01 Trillion
-
-AAPL exhibits strong bullish momentum, advancing 3.2% in October 2026 from a low close of $332.89 (Oct 5) to its new 52-week intraday high of $348.15 (Oct 13). This price appreciation was supported by significant trading volume expansion—rising to nearly **60 million shares** on October 16 compared to the daily average of **44.45 million shares**—indicating robust institutional accumulation.
-
-```
-52-Week Range &amp; Current Position:
-[$243.42] --------------------------------------------- [$343.46]--[$348.15]
-52-Wk Low                                              Current    52-Wk High
-                                                     (-1.3% from High)
-```
-
-### Macroeconomic Environment
-1. **Monetary Easing (Fed Funds Rate at 3.75%):** The Federal Reserve's rate reductions from peak levels of 5.33% (early 2024) down to 3.75% (September 2026) support higher equity valuation multiples for mega-cap technology names while improving consumer financing terms (e.g., Apple Card installment plans).
-2. **Labor Market Stability (4.2% Unemployment):** Range-bound unemployment (4.1%–4.4% throughout 2025–2026) maintains consumer discretionary spending capacity for premium technology hardware.
-3. **Persistent Consumer Inflation (CPI 336.3):** Although input costs remain elevated, Apple's established pricing power allows it to pass marginal costs on to consumers without severely dampening overall demand.
-
----
-
-## 4. Key Investment Risks
-
-1. **Near-Term Hardware Price Resistance:** Unconfirmed reports of 15%–20% component cuts for the iPhone 18 Pro highlight potential consumer sensitivity to elevated price points. If price increases outpace consumer willingness to upgrade, hardware sales volumes could soften in upcoming quarters.
-2. **China AI Execution &amp; Rollout Timelines:** While regulatory approval is officially secured, uncertainties remain regarding the operational timeline, localized feature rollout, and consumer adoption rates of Apple Intelligence in China.
-3. **Valuation Sensitivity at Highs:** With the stock trading within 1.3% of its 52-week high and carrying a $5.01 trillion valuation, any unexpected operational stumble or macroeconomic shift could spark short-term profit-taking.
-
----
-
-## 5. Synthesis &amp; Investment Outlook
-
-Apple Inc. presents a compelling fundamental profile characterized by expanding earnings power, an unbeatable 8-quarter consensus surprise track record, and a lower-rate macroeconomic backdrop. 
-
-* **Strengths:** Verified approval of Apple Intelligence in China addresses a major geographic risk, while institutional volume support confirms strong market demand near all-time highs.
-* **Considerations:** Investors should carefully weigh confirmed operational strengths against unconfirmed supply chain reports regarding iPhone 18 Pro price friction.
-
-**Conclusion:** AAPL remains a structurally dominant mega-cap leader. Near-term price pullbacks driven by temporary supply chain headlines may present attractive positioning opportunities, provided Apple continues to execute on its high-margin services strategy and global AI rollout.
+**Conclusion:** AAPL demonstrates strong operational re-acceleration, supported by record margins, consecutive earnings beats, and favorable macroeconomic tailwinds. While technical momentum and regulatory approvals in China bolster the bull case, investors must weigh these factors against unconfirmed hardware production cuts and speculative assumptions surrounding AI revenue models.
 
 === Score Comparison ===
-Run 1: 8.5/10
-Run 2: 9.0/10
+Run 1: 9.5/10
+Run 2: 8.0/10
+Run 3: 9.0/10
 </pre>
 </div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=47">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="Observations">Observations<a class="anchor-link" href="#Observations">¶</a></h3><p>Run 1 read memory from the seeding run and produced a targeted analysis
-addressing prior gaps. Run 2's planner explicitly targeted gaps identified
-in Run 1's reflection, demonstrating that the memory and self-reflection
-feedback loop functioned as designed. The score improvement from Run 1
-(8.5/10) to Run 2 (9.0/10) reflects the planner's effective use of prior
-context to produce a more comprehensive synthesis across three compounding runs.</p>
 </div>
 </div>
 </div>
@@ -9842,19 +9895,38 @@ context to produce a more comprehensive synthesis across three compounding runs.
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h3 id="Observations">Observations<a class="anchor-link" href="#Observations">¶</a></h3><p>The Score Comparison above lists the evaluation score for each of the three
+runs. A run that scores at or above the 7.0 threshold completes after a single
+evaluation; a lower score triggers refinement, up to three iterations. Scores
+come from an LLM evaluator, and re-scoring identical text can return a
+different value (compare Run 1's score above with Step 1 of Section 7, which
+evaluates the same saved synthesis), so differences between runs are not by
+themselves evidence of improvement or degradation. The memory effect is shown
+by planner behavior instead: the plan printed in Section 8 is generated from
+Run 1's saved memory and addresses gaps identified in the prior analysis.</p>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=49">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
 <hr/>
-<h2 id="12.-Test-Suite">12. Test Suite<a class="anchor-link" href="#12.-Test-Suite">¶</a></h2><p>All 31 contract tests pass without API calls, confirming the inter-agent schema,
+<h2 id="12.-Test-Suite">12. Test Suite<a class="anchor-link" href="#12.-Test-Suite">¶</a></h2><p>All contract tests pass without API calls, confirming the inter-agent schema,
 routing logic, evaluator-optimizer loop, LLM retry behavior, and tool error
 handling behave correctly in isolation.</p>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=49">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=50">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [23]:</div>
+<div class="jp-InputPrompt jp-InputArea-prompt">In [24]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
 <div class="highlight hl-ipython3"><pre><span></span><span class="c1"># Run the full test suite</span>
@@ -9882,60 +9954,54 @@ handling behave correctly in isolation.</p>
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre><span class="ansi-bold">============================= test session starts ==============================</span>
-<span class="ansi-bold">collecting ... </span>collected 31 items
+<span class="ansi-bold">collecting ... </span>collected 42 items
 
-tests/test_evaluator_optimizer.py::test_stops_immediately_when_threshold_is_met <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [  3%]</span>
-tests/test_evaluator_optimizer.py::test_refines_until_threshold_is_met <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [  6%]</span>
-tests/test_evaluator_optimizer.py::test_stops_at_max_iterations_when_threshold_is_not_met <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [  9%]</span>
-tests/test_fundamentals.py::test_fetch_earnings_returns_empty_list_on_api_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 12%]</span>
-tests/test_fundamentals.py::test_fetch_income_statement_returns_empty_list_on_api_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 16%]</span>
-tests/test_fundamentals.py::test_fetch_earnings_returns_list_on_success <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 19%]</span>
-tests/test_fundamentals.py::test_fetch_income_statement_returns_expected_keys_on_success <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 22%]</span>
-tests/test_llm.py::test_call_llm_retries_on_transient_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg">     [ 25%]</span>
-tests/test_llm.py::test_call_llm_raises_after_max_retries <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg">         [ 29%]</span>
-tests/test_llm.py::test_call_llm_does_not_retry_value_error <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg">       [ 32%]</span>
-tests/test_macro_data.py::test_fetch_macro_indicators_returns_empty_lists_on_total_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 35%]</span>
-tests/test_macro_data.py::test_fetch_macro_indicators_returns_empty_list_on_series_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 38%]</span>
-tests/test_macro_data.py::test_fetch_macro_indicators_returns_expected_keys_on_success <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 41%]</span>
-tests/test_news_data.py::test_fetch_news_returns_empty_list_on_api_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 45%]</span>
-tests/test_news_data.py::test_fetch_news_returns_list_of_dicts_on_success <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 48%]</span>
-tests/test_price_data.py::test_fetch_price_history_returns_empty_dataframe_on_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 51%]</span>
-tests/test_price_data.py::test_fetch_price_summary_returns_none_values_on_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 54%]</span>
-tests/test_price_data.py::test_fetch_price_summary_returns_expected_keys_on_success <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 58%]</span>
+tests/test_evaluator_optimizer.py::test_stops_immediately_when_threshold_is_met <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [  2%]</span>
+tests/test_evaluator_optimizer.py::test_refines_until_threshold_is_met <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [  4%]</span>
+tests/test_evaluator_optimizer.py::test_stops_at_max_iterations_when_threshold_is_not_met <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [  7%]</span>
+tests/test_fundamentals.py::test_fetch_earnings_returns_empty_list_on_api_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [  9%]</span>
+tests/test_fundamentals.py::test_fetch_income_statement_returns_empty_list_on_api_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 11%]</span>
+tests/test_fundamentals.py::test_fetch_earnings_returns_list_on_success <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 14%]</span>
+tests/test_fundamentals.py::test_fetch_income_statement_returns_expected_keys_on_success <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 16%]</span>
+tests/test_fundamentals.py::test_quota_message_is_reported_and_key_is_redacted <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 19%]</span>
+tests/test_fundamentals.py::test_exception_text_does_not_leak_api_key <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 21%]</span>
+tests/test_fundamentals.py::test_successful_results_are_cached_and_isolated <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 23%]</span>
+tests/test_fundamentals.py::test_empty_results_are_not_cached <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg">     [ 26%]</span>
+tests/test_fundamentals.py::test_back_to_back_requests_are_spaced_for_the_burst_limit <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 28%]</span>
+tests/test_fundamentals.py::test_requests_far_apart_do_not_wait <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg">   [ 30%]</span>
+tests/test_llm.py::test_call_llm_retries_on_transient_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg">     [ 33%]</span>
+tests/test_llm.py::test_call_llm_raises_after_max_retries <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg">         [ 35%]</span>
+tests/test_llm.py::test_call_llm_does_not_retry_value_error <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg">       [ 38%]</span>
+tests/test_llm.py::test_call_llm_does_not_retry_non_transient_errors <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 40%]</span>
+tests/test_macro_data.py::test_fetch_macro_indicators_returns_empty_lists_on_total_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 42%]</span>
+tests/test_macro_data.py::test_fetch_macro_indicators_returns_empty_list_on_series_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 45%]</span>
+tests/test_macro_data.py::test_fetch_macro_indicators_returns_expected_keys_on_success <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 47%]</span>
+tests/test_news_data.py::test_fetch_news_returns_empty_list_on_api_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 50%]</span>
+tests/test_news_data.py::test_fetch_news_returns_list_of_dicts_on_success <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 52%]</span>
+tests/test_price_data.py::test_fetch_price_history_returns_empty_dataframe_on_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 54%]</span>
+tests/test_price_data.py::test_fetch_price_summary_returns_none_values_on_failure <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 57%]</span>
+tests/test_price_data.py::test_fetch_price_summary_returns_expected_keys_on_success <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 59%]</span>
 tests/test_router.py::test_earnings_content_routes_to_earnings_analyzer <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 61%]</span>
 tests/test_router.py::test_news_content_routes_to_news_analyzer <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg">   [ 64%]</span>
-tests/test_router.py::test_market_content_routes_to_market_analyzer <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 67%]</span>
-tests/test_router.py::test_macro_content_routes_to_market_analyzer <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 70%]</span>
-tests/test_router.py::test_router_dispatches_on_content_not_source <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 74%]</span>
-tests/test_router.py::test_router_populates_correct_analysis_field <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 77%]</span>
-tests/test_router.py::test_unrecognized_content_defaults_to_news <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg">  [ 80%]</span>
-tests/test_schema_contract.py::test_empty_analysis_matches_schema <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 83%]</span>
-tests/test_schema_contract.py::test_empty_analysis_preserves_ticker <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 87%]</span>
-tests/test_schema_contract.py::test_empty_analysis_field_types_match_schema <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 90%]</span>
-tests/test_schema_contract.py::test_empty_analysis_initial_values <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 93%]</span>
-tests/test_schema_contract.py::test_content_type_enum_has_all_values <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 96%]</span>
-tests/test_schema_contract.py::test_content_type_values_are_uppercase <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [100%]</span>
+tests/test_router.py::test_market_content_routes_to_market_analyzer <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 66%]</span>
+tests/test_router.py::test_macro_content_routes_to_market_analyzer <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 69%]</span>
+tests/test_router.py::test_router_dispatches_on_content_not_source <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 71%]</span>
+tests/test_router.py::test_router_populates_correct_analysis_field <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 73%]</span>
+tests/test_router.py::test_unrecognized_content_defaults_to_news <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg">  [ 76%]</span>
+tests/test_schema_contract.py::test_empty_analysis_matches_schema <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 78%]</span>
+tests/test_schema_contract.py::test_empty_analysis_preserves_ticker <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 80%]</span>
+tests/test_schema_contract.py::test_empty_analysis_field_types_match_schema <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 83%]</span>
+tests/test_schema_contract.py::test_empty_analysis_initial_values <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 85%]</span>
+tests/test_schema_contract.py::test_content_type_enum_has_all_values <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 88%]</span>
+tests/test_schema_contract.py::test_content_type_values_are_uppercase <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 90%]</span>
+tests/test_specialist_agents.py::test_earnings_analyzer_skips_llm_when_no_data <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 92%]</span>
+tests/test_specialist_agents.py::test_earnings_analyzer_calls_llm_when_some_data_exists <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 95%]</span>
+tests/test_specialist_agents.py::test_market_analyzer_skips_llm_when_no_data <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [ 97%]</span>
+tests/test_specialist_agents.py::test_market_analyzer_calls_llm_when_some_data_exists <span class="ansi-green-fg">PASSED</span><span class="ansi-green-fg"> [100%]</span>
 
-<span class="ansi-green-fg">============================== </span><span class="ansi-green-intense-fg ansi-bold">31 passed</span><span class="ansi-green-fg"> in 0.48s</span><span class="ansi-green-fg"> ==============================</span>
+<span class="ansi-green-fg">============================== </span><span class="ansi-green-intense-fg ansi-bold">42 passed</span><span class="ansi-green-fg"> in 0.47s</span><span class="ansi-green-fg"> ==============================</span>
 </pre>
 </div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=50">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<hr/>
-<h2 id="13.-References">13. References<a class="anchor-link" href="#13.-References">¶</a></h2><p>Doosterlinck, K., et al. (2024). Evaluating the consistency of LLM evaluators.
-<a href="https://arxiv.org/html/2412.00543v1">https://arxiv.org/html/2412.00543v1</a></p>
-<p>EvidentlyAI. (2024). LLM-as-a-judge guide.
-<a href="https://www.evidentlyai.com/llm-evaluation/llm-as-a-judge">https://www.evidentlyai.com/llm-evaluation/llm-as-a-judge</a></p>
-<p>Mokhtari Jadid, K. (2026, September). [Response to student question on RAG
-requirement]. AAI-520 course Slack channel, University of San Diego.</p>
 </div>
 </div>
 </div>
@@ -9946,7 +10012,21 @@ requirement]. AAI-520 course Slack channel, University of San Diego.</p>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<p><br/><br/><em><strong>AI Use Disclosure:</strong></em> <em>Portions of this notebook were developed with the assistance of Claude (Anthropic, 2026), an AI language model. The AI was used to help structure code, write comments, and draft markdown explanations. All outputs were reviewed, questioned, and revised through an iterative dialogue to ensure conceptual accuracy and alignment with assignment requirements. The underlying ideas, algorithmic choices, and written reflection represent the authors' own understanding of the material.</em></p>
+<hr/>
+<h2 id="13.-References">13. References<a class="anchor-link" href="#13.-References">¶</a></h2><p>Anthropic. (2026). Claude [Large language model]. <a href="https://claude.ai">https://claude.ai</a></p>
+<p>Lee, N., Hong, J., &amp; Thorne, J. (2024). Evaluating the consistency of LLM
+evaluators. arXiv. <a href="https://arxiv.org/abs/2412.00543">https://arxiv.org/abs/2412.00543</a></p>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=52">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p><br/><br/><em><strong>AI Use Disclosure:</strong></em> <em>Claude (Anthropic, 2026), an AI language model, was used throughout this project to help design and write code and tests, debug failures, write code comments and markdown explanations, and review notebook outputs. The authors ran all code, reviewed and revised the AI's contributions, and are responsible for the final work.</em></p>
 </div>
 </div>
 </div>

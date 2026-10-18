@@ -36,6 +36,9 @@ class MarketAnalyzer(BaseAgent):
         Fetch price and macro data, analyze with LLM, and populate
         analysis["market_analysis"].
 
+        If neither price nor macroeconomic data is available, the LLM call is
+        skipped and a short unavailability note is stored instead.
+
         Args:
             analysis: Shared analysis dict (see agents/schema.py)
 
@@ -46,6 +49,21 @@ class MarketAnalyzer(BaseAgent):
         price_history = fetch_price_history(self.ticker, period="3mo")
         price_summary = fetch_price_summary(self.ticker)
         macro         = fetch_macro_indicators()
+
+        # On failure the price tools return an empty DataFrame and a summary of
+        # None values (the ticker key is always present), and the macro tool
+        # returns empty lists. With no data at all, skip the LLM call so the
+        # model is not asked to analyze nothing.
+        no_prices = price_history.empty and all(
+            value is None for key, value in price_summary.items() if key != "ticker"
+        )
+        no_macro = not any(macro.values())
+        if no_prices and no_macro:
+            print(f"      Warning: no market data for {self.ticker}; skipping LLM analysis")
+            analysis["market_analysis"] = (
+                "Price and macroeconomic data were unavailable for analysis."
+            )
+            return analysis
 
         prompt = (
             f"Analyze the following market and macroeconomic data for "
