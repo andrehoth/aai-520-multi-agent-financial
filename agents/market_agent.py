@@ -7,6 +7,10 @@ tools/price_data.py, and macroeconomic indicators from FRED via
 tools/macro_data.py. Produces a narrative analysis covering price
 trends, momentum, and macro context.
 
+When the pipeline routes MARKET or MACRO-classified articles to this agent
+via extra_context, those articles are appended to the prompt as supplementary
+context alongside the structured price and macro data.
+
 Populates analysis["market_analysis"] in the shared analysis dict.
 See agents/schema.py for the full schema definition.
 """
@@ -31,7 +35,7 @@ class MarketAnalyzer(BaseAgent):
             f"Relate the macro environment to the stock where relevant."
         )
 
-    def run(self, analysis: dict) -> dict:
+    def run(self, analysis: dict, extra_context: str = "") -> dict:
         """
         Fetch price and macro data, analyze with LLM, and populate
         analysis["market_analysis"].
@@ -39,8 +43,16 @@ class MarketAnalyzer(BaseAgent):
         If neither price nor macroeconomic data is available, the LLM call is
         skipped and a short unavailability note is stored instead.
 
+        When extra_context is provided (MARKET or MACRO-classified articles
+        routed from the pipeline), it is appended to the prompt as a labeled
+        section after the structured data. The existing system prompt instruction
+        to stay grounded in the supplied data applies to this section as well.
+
         Args:
-            analysis: Shared analysis dict (see agents/schema.py)
+            analysis:      Shared analysis dict (see agents/schema.py)
+            extra_context: Optional MARKET/MACRO-classified news articles routed
+                           from the pipeline via ContentRouter.classify_batch().
+                           Appended to the prompt when non-empty.
 
         Returns:
             Updated analysis dict with market_analysis populated
@@ -76,6 +88,16 @@ class MarketAnalyzer(BaseAgent):
             f"{price_history.tail(10).to_string()}\n\n"
             f"Macroeconomic Indicators:\n{macro}"
         )
+
+        # Append routed market and macro articles when provided. Labeled clearly
+        # so the model treats them as supplementary news context rather than
+        # structured data, and does not conflate article figures with yfinance
+        # or FRED data.
+        if extra_context:
+            prompt += (
+                f"\n\nRelated Market and Macro News (routed articles for additional context):\n"
+                f"{extra_context}"
+            )
 
         analysis["market_analysis"] = self.call(prompt)
         return analysis
