@@ -6,6 +6,10 @@ Receives quarterly earnings and income statement data from Alpha Vantage
 via tools/fundamentals.py and produces a narrative analysis covering
 earnings trends, revenue growth, profit margins, and notable surprises.
 
+When the pipeline routes EARNINGS-classified articles to this agent via
+extra_context, those articles are appended to the prompt as supplementary
+context alongside the structured Alpha Vantage data.
+
 Populates analysis["earnings_analysis"] in the shared analysis dict.
 See agents/schema.py for the full schema definition.
 """
@@ -29,7 +33,7 @@ class EarningsAnalyzer(BaseAgent):
             f"numbers. Highlight notable earnings surprises and any trend changes."
         )
 
-    def run(self, analysis: dict) -> dict:
+    def run(self, analysis: dict, extra_context: str = "") -> dict:
         """
         Fetch earnings and income statement data, analyze with LLM, and
         populate analysis["earnings_analysis"].
@@ -38,8 +42,16 @@ class EarningsAnalyzer(BaseAgent):
         request limit was reached), the LLM call is skipped and a short
         unavailability note is stored instead.
 
+        When extra_context is provided (EARNINGS-classified articles routed
+        from the pipeline), it is appended to the prompt as a labeled section
+        after the structured data. The existing system prompt instruction to
+        stay grounded in the supplied data applies to this section as well.
+
         Args:
-            analysis: Shared analysis dict (see agents/schema.py)
+            analysis:      Shared analysis dict (see agents/schema.py)
+            extra_context: Optional EARNINGS-classified news articles routed
+                           from the pipeline via ContentRouter.classify_batch().
+                           Appended to the prompt when non-empty.
 
         Returns:
             Updated analysis dict with earnings_analysis populated
@@ -70,6 +82,15 @@ class EarningsAnalyzer(BaseAgent):
             f"Quarterly Income Statements (most recent first):\n"
             f"{income}"
         )
+
+        # Append routed earnings articles when provided. Labeled clearly so
+        # the model treats them as supplementary news context, not structured
+        # data, and does not conflate article figures with Alpha Vantage data.
+        if extra_context:
+            prompt += (
+                f"\n\nRelated Earnings News (routed articles for additional context):\n"
+                f"{extra_context}"
+            )
 
         analysis["earnings_analysis"] = self.call(prompt)
         return analysis

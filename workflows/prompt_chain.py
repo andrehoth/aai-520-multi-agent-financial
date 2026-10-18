@@ -6,8 +6,11 @@ Implements a sequential news processing chain where the output of each
 stage is passed as input to the next:
     Ingest > Preprocess > Classify > Extract > Summarize
 
-Each stage is a separate LLM call. The chain is self-contained;
-news retrieval occurs inside ingest() via tools/news_data.fetch_news().
+Each stage is a separate LLM call. In the pipeline, article ingestion and
+routing happen in the orchestrator (agents/investment_agent.py) before the
+chain is called, so run() accepts an articles parameter and processes only
+the NEWS-classified subset. ingest() remains on the class for standalone use
+and the notebook demonstration.
 
 See agents/schema.py for the shared analysis dict definition.
 """
@@ -23,7 +26,13 @@ class NewsProcessingChain:
         self.ticker = ticker
 
     def ingest(self) -> list[dict]:
-        """Retrieve recent news articles using the shared NewsAPI tool."""
+        """
+        Retrieve recent news articles using the shared NewsAPI tool.
+
+        In the pipeline this is called by the orchestrator before routing
+        so that all articles are available for classification. It is also
+        available here for standalone use and the notebook demonstration.
+        """
         return fetch_news(self.ticker)
 
     def preprocess(self, articles: list[dict]) -> str:
@@ -124,9 +133,27 @@ class NewsProcessingChain:
             temperature=0.2,
         )
 
-    def run(self) -> str:
-        """Run the complete five-stage news processing chain."""
-        articles = self.ingest()
+    def run(self, articles: list[dict] = None) -> str:
+        """
+        Run the complete five-stage news processing chain.
+
+        When called from the pipeline, articles are provided by the
+        orchestrator after routing so that only NEWS-classified articles
+        pass through the chain. When called standalone (for example, in
+        the notebook demonstration), articles defaults to None and the
+        chain fetches all articles itself via ingest().
+
+        Args:
+            articles: Pre-fetched and pre-filtered article list, or None to
+                      fetch all articles via ingest().
+
+        Returns:
+            Summarized news string, or empty string if no articles survive
+            any stage of the chain.
+        """
+        # Fetch all articles when called standalone (notebook or direct use)
+        if articles is None:
+            articles = self.ingest()
 
         if not articles:
             return ""
